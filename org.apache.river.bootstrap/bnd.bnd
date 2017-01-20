@@ -1,0 +1,23 @@
+Bundle-Version: 0.0.0.${tstamp}
+-dsannotations: *
+-buildpath: \
+	org.eclipse.osgi,\
+	org.apache.river;version=latest,\
+	slf4j.api,\
+	org.eclipse.osgi.services,\
+	org.eclipse.equinox.preferences
+Export-Package: \
+	org.apache.river.bootstrap.service,\
+	org.apache.river.bootstrap,\
+	org.apache.river.bootstrap.client,\
+	org.apache.river.bootstrap.common,\
+	org.apache.river.bootstrap.service.smart,\
+	org.apache.river.bootstrap.service.lease
+
+Bundle-Activator: org.apache.river.bootstrap.internal.RiverBootstrapActivator
+Private-Package: \
+	org.apache.river.bootstrap.codeserver,\
+	org.apache.river.bootstrap.service.internal,\
+	org.apache.river.bootstrap.internal,\
+	org.apache.river.bootstrap.client.internal,\
+	org.apache.river.bootstrap.service.lease.internal

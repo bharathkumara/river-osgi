@@ -1,0 +1,9 @@
+Bundle-Version: 0.0.0.${tstamp}
+Private-Package: org.apache.river.service.lookup
+Include-Resource: plugin.xml=_plugin.xml
+-dsannotations: *
+-includeresource: resources/
+-buildpath: \
+	org.eclipse.osgi;version=3.11,\
+	org.eclipse.equinox.preferences,\
+	org.eclipse.osgi.services
