@@ -22,8 +22,12 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
+import org.apache.river.api.io.AtomicSerial;
+import org.apache.river.api.io.AtomicSerial.GetArg;
+import org.apache.river.api.net.Uri;
 
 /**
  * A 128-bit value to serve as a universally unique identifier.  Two
@@ -112,6 +116,7 @@ import java.io.Serializable;
  * @author Sun Microsystems, Inc.
  * @since 2.0
  **/
+@AtomicSerial
 public class Uuid implements Serializable {
 
     private static final long serialVersionUID = -106268922535833151L;
@@ -130,6 +135,27 @@ public class Uuid implements Serializable {
      **/
     private final long bits1;
 
+    private static boolean check(GetArg arg) throws IOException{
+	Class [] serialClasses = arg.serialClasses();
+	for (Class c : serialClasses){
+	    if (Externalizable.class.isAssignableFrom(c))
+		throw new InvalidObjectException("invalid class: " + c.getName());
+	}
+	long bits0 = arg.get("bits0", 0L);
+	long bits1 = arg.get("bits1", 0L);
+	if (bits0 == 0 && bits1 == 0) throw new InvalidObjectException("looks like a hash collission attack");
+	return true;
+    }
+    
+    public Uuid(GetArg arg) throws IOException{
+	this(arg, check(arg));
+    }
+    
+    private Uuid(GetArg arg, boolean check) throws IOException{
+	bits0 = arg.get("bits0", 0L);
+	bits1 = arg.get("bits1", 0L);
+    }
+
     /**
      * Creates a new <code>Uuid</code> with the specified 128-bit
      * value.
@@ -141,7 +167,7 @@ public class Uuid implements Serializable {
      * @throws SecurityException if the class of this object
      * implements <code>Externalizable</code>
      **/
-    protected Uuid(long bits0, long bits1) {
+    protected Uuid(long bits0, long bits1) { //This isn't the greatest security solution
 	if (!isValid()) {
 	    throw new SecurityException("invalid class: " +
 					this.getClass().getName());
@@ -202,6 +228,14 @@ public class Uuid implements Serializable {
     }
 
     /**
+     * Converts Uuid to an RFC4122 compliant URI containing the Uuid.
+     * 
+     * @return a RFC4122 compliant URI.
+     */
+    public final Uri toUri(){
+        return Uri.create("urn:uuid:" + toString());
+    }
+    /**
      * Returns a string representation of this <code>Uuid</code>.
      *
      * <p>The string representation is 36 characters long, with five
@@ -224,9 +258,9 @@ public class Uuid implements Serializable {
      *
      * <li><code>node</code> (12 hexadecimal digits)
      *
+     * <p>As an example, a <code>Uuid</code> with the 128-bit value
      * </ul>
      *
-     * <p>As an example, a <code>Uuid</code> with the 128-bit value
      *
      * <pre>0x0123456789ABCDEF0123456789ABCDEF</pre>
      *
@@ -302,7 +336,7 @@ public class Uuid implements Serializable {
      * @throws Throwable if the superclass's <code>finalize</code>
      * method throws a <code>Throwable</code>
      **/
-    protected final void finalize() throws Throwable { }
+//    protected final void finalize() throws Throwable { }
 
     /**
      * Returns this object.  This method prevents a subclass from
@@ -326,9 +360,16 @@ public class Uuid implements Serializable {
 	return this;
     }
 
+    private void writeObject(ObjectOutputStream out) throws IOException {
+	out.defaultWriteObject();
+    }
+
     /**
      * @throws InvalidObjectException if the class of this object
      * implements <code>Externalizable</code>
+     * @param in ObjectInputStream
+     * @throws ClassNotFoundException if class not found.
+     * @throws IOException if a problem occurs during de-serialization.
      **/
     private void readObject(ObjectInputStream in)
 	throws IOException, ClassNotFoundException

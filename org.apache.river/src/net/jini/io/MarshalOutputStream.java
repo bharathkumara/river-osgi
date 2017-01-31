@@ -98,16 +98,22 @@ public class MarshalOutputStream
 	}
 	this.context = context;
         
-        AccessController.doPrivileged(new PrivilegedAction<Object>(){
-
-            @Override
-            public Object run() {
-                enableReplaceObject(true);
-                return null;
+//        AccessController.doPrivileged(new PrivilegedAction<Object>(){
+//
+//            @Override
+//            public Object run() {
+//                enableReplaceObject(true);
+//                return null;
+//            }
+//            
+//        });
             }
             
-        });
+    protected MarshalOutputStream(Collection context) throws IOException{
+	super();
+	this.context = context;
     }
+
 
     /**
      * Returns the collection of context information objects that
@@ -138,6 +144,7 @@ public class MarshalOutputStream
      * @throws NullPointerException if <code>cl</code> is
      * <code>null</code>
      **/
+    @Override
     protected void annotateClass(Class cl) throws IOException {
 	writeAnnotation(ClassLoading.getClassAnnotation(cl));
     }
@@ -164,6 +171,7 @@ public class MarshalOutputStream
      * @throws NullPointerException if <code>cl</code> is
      * <code>null</code>
      **/
+    @Override
     protected void annotateProxyClass(Class cl) throws IOException {
 	writeAnnotation(ClassLoading.getClassAnnotation(cl));
     }

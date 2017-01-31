@@ -19,7 +19,6 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Spliterator;
 
 /**
  *
@@ -56,11 +55,5 @@ abstract class ReferenceCollectionRefreshAfterSerialization<T>
         }
         return result;
     }
-
-	@Override
-	public Spliterator<T> spliterator() {
-		// TODO Auto-generated method stub
-		return super.spliterator();
-	}
     
 }

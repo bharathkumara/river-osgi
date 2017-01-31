@@ -161,7 +161,7 @@ import net.jini.security.policy.PolicyInitializationException;
  * <dt>alias: <i>name </i>
  * <dd>Denotes substitution of a KeyStore alias. Namely, if a KeyStore has an
  * X.509 certificate associated with the specified name, then replaced by
- * <i>javax.security.auth.x500.X500Principal &quot; <i>DN </i>&quot; </i>
+ * <code>javax.security.auth.x500.X500Principal &quot; <i>DN </i>&quot; </code>
  * string, where <i>DN </i> is a certificate's subject distinguished name.
  * </dl>
  * <br>
@@ -174,8 +174,6 @@ import net.jini.security.policy.PolicyInitializationException;
  * clause has precedence over all GRANT clause Permissions except for AllPermission.
  * <br>
  * This implementation is thread-safe and scalable.
- * @author Peter Firmstone.
- * @since 2.2.1
  */
 
 public class ConcurrentPolicyFile extends Policy implements ScalableNestedPolicy {
@@ -198,7 +196,7 @@ public class ConcurrentPolicyFile extends Policy implements ScalableNestedPolicy
     // A specific parser for a particular policy file format.
     private final PolicyParser parser;
     
-    private static final Guard guard = new SecurityPermission("getPolicy");
+    private static final Guard guard = new SecurityPermission("createPolicy.JiniPolicy");
     
     private static final ProtectionDomain myDomain = 
         AccessController.doPrivileged(new PrivilegedAction<ProtectionDomain>(){
@@ -216,6 +214,7 @@ public class ConcurrentPolicyFile extends Policy implements ScalableNestedPolicy
     /**
      * Default constructor, equivalent to
      * <code>ConcurrentPolicyFile(new DefaultPolicyParser())</code>.
+     * @throws net.jini.security.policy.PolicyInitializationException in instantiation unsuccessful
      */
     public ConcurrentPolicyFile() throws PolicyInitializationException {
         this(new DefaultPolicyParser(), new PermissionComparator());
@@ -229,13 +228,13 @@ public class ConcurrentPolicyFile extends Policy implements ScalableNestedPolicy
      * This method is called during construction prior to the implicit
      * super() call to Object and prior to any final fields being assigned.
      */
-    private static PermissionGrant [] check(PolicyParser parser) throws PolicyInitializationException{
+    private static PermissionGrant [] readPolicyPermissionGrants(PolicyParser parser) throws PolicyInitializationException{
         guard.checkGuard(null);
         try {
             // Bug 4911907, do we need to do anything more?
             // The permissions for this domain must be retrieved before
             // construction is complete and this policy takes over.
-            return initialize(parser); // Instantiates myPermissions.
+            return readPoliciesNoCheckGuard(parser); // Instantiates myPermissions.
         } catch (SecurityException e){
             throw e;
         } catch (Exception e){
@@ -245,7 +244,7 @@ public class ConcurrentPolicyFile extends Policy implements ScalableNestedPolicy
     
     protected ConcurrentPolicyFile(PolicyParser dpr, Comparator<Permission> comp) 
             throws PolicyInitializationException {
-        this (dpr, comp, check(dpr));
+        this (dpr, comp, readPolicyPermissionGrants(dpr));
     }
 
     /**
@@ -452,13 +451,13 @@ public class ConcurrentPolicyFile extends Policy implements ScalableNestedPolicy
     @Override
     public void refresh() {
         try {
-            grantArray = initialize(parser);
+            grantArray = readPoliciesNoCheckGuard(parser);
         } catch (Exception ex) {
             System.err.println(ex);
         }
     }
     
-    private static PermissionGrant [] initialize(final PolicyParser parser) throws Exception{
+    private static PermissionGrant [] readPoliciesNoCheckGuard(final PolicyParser parser) throws Exception{
         try {
             Collection<PermissionGrant> fresh = AccessController.doPrivileged( 
                 new PrivilegedExceptionAction<Collection<PermissionGrant>>(){

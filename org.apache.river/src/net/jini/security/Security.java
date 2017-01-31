@@ -18,9 +18,6 @@
 
 package net.jini.security;
 
-import org.apache.river.collection.WeakIdentityMap;
-import org.apache.river.logging.Levels;
-import org.apache.river.resource.Service;
 import java.lang.ref.SoftReference;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -42,14 +39,14 @@ import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.WeakHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -58,7 +55,11 @@ import javax.security.auth.Subject;
 import javax.security.auth.SubjectDomainCombiner;
 import net.jini.security.policy.DynamicPolicy;
 import net.jini.security.policy.SecurityContextSource;
+import org.apache.river.api.security.PermissionGrant;
+import org.apache.river.api.security.RevocablePolicy;
 import org.apache.river.api.security.SubjectDomain;
+import org.apache.river.logging.Levels;
+import org.apache.river.resource.Service;
 
 /**
  * Provides methods for executing actions with privileges enabled, for
@@ -152,12 +153,11 @@ import org.apache.river.api.security.SubjectDomain;
  */
 public final class Security {
 
-    private static final Logger trustLogger =
-		Logger.getLogger("net.jini.security.trust");
-    private static final Logger integrityLogger =
-		Logger.getLogger("net.jini.security.integrity");
-    private static final Logger policyLogger =
-		Logger.getLogger("net.jini.security.policy");
+    private static Logger trustLogger;
+    private static Logger integrityLogger;
+    private static Logger policyLogger;
+    
+    private static final Object loggingLock = new Object();
 
     /**
      * Weak map from String to [URL[], SoftReference(key)]
@@ -166,7 +166,8 @@ public final class Security {
     /**
      * Weak map from ClassLoader to SoftReference(IntegrityVerifier[]).
      */
-    private static final WeakIdentityMap integrityMap = new WeakIdentityMap();
+    private static final Map<ClassLoader,SoftReference<IntegrityVerifier[]>> integrityMap 
+	    = new WeakHashMap<ClassLoader,SoftReference<IntegrityVerifier[]>>();
 
     /**
      * SecurityManager instance used to obtain caller's Class.
@@ -175,6 +176,39 @@ public final class Security {
 	AccessController.doPrivileged(new PrivilegedAction() {
 	    public Object run() { return new ClassContextAccess(); }
 	});
+
+    /**
+     * @return the trustLogger
+     */
+    private static Logger getTrustLogger() {
+        synchronized (loggingLock){
+            if (trustLogger != null) return trustLogger;
+            trustLogger = Logger.getLogger("net.jini.security.trust");
+            return trustLogger;
+        }
+    }
+
+    /**
+     * @return the integrityLogger
+     */
+    private static Logger getIntegrityLogger() {
+        synchronized (loggingLock){
+            if (integrityLogger != null) return integrityLogger;
+            integrityLogger = Logger.getLogger("net.jini.security.integrity"); 
+            return integrityLogger;
+        }
+    }
+
+    /**
+     * @return the policyLogger
+     */
+    private static Logger getPolicyLogger() {
+        synchronized (loggingLock){
+            if (policyLogger != null) return policyLogger;
+            policyLogger = Logger.getLogger("net.jini.security.policy");
+            return policyLogger;
+        }
+    }
 
     /**
      * Non-instantiable.
@@ -266,8 +300,8 @@ public final class Security {
 	}
 	SecurityException e = new SecurityException(
 					    "object is not trusted: " + obj);
-	if (trustLogger.isLoggable(Levels.FAILED)) {
-	    logThrow(trustLogger, Levels.FAILED,
+	if (getTrustLogger().isLoggable(Levels.FAILED)) {
+	    logThrow(getTrustLogger(), Levels.FAILED,
 		     Security.class.getName(), "verifyObjectTrust",
 		     "no verifier trusts {0}",
 		     new Object[]{obj}, e);
@@ -330,8 +364,8 @@ public final class Security {
 	for (int i = urls.length; --i >= 0; ) {
 	    for (int j = 0; j < verifiers.length; j++) {
 		if (verifiers[j].providesIntegrity(urls[i])) {
-		    if (integrityLogger.isLoggable(Level.FINE)) {
-			integrityLogger.log(Level.FINE, 
+		    if (getIntegrityLogger().isLoggable(Level.FINE)) {
+			getIntegrityLogger().log(Level.FINE, 
 					    "{0} verifies {1}",
 					     new Object[]{verifiers[j],
 							  urls[i]});
@@ -342,8 +376,8 @@ public final class Security {
 	    SecurityException e =
 		new SecurityException("URL does not provide integrity: " +
 				      urls[i]);
-	    if (integrityLogger.isLoggable(Levels.FAILED)) {
-		logThrow(integrityLogger, Levels.FAILED,
+	    if (getIntegrityLogger().isLoggable(Levels.FAILED)) {
+		logThrow(getIntegrityLogger(), Levels.FAILED,
 			 Security.class.getName(), "verifyCodebaseIntegrity",
 			 "no verifier verifies {0}", new Object[]{urls[i]}, e);
 	    }
@@ -401,19 +435,19 @@ public final class Security {
     private static IntegrityVerifier[] getIntegrityVerifiers(
 							final ClassLoader cl)
     {
-	SoftReference ref;
+	SoftReference<IntegrityVerifier[]> ref;
 	synchronized (integrityMap) {
-	    ref = (SoftReference) integrityMap.get(cl);
+	    ref = integrityMap.get(cl);
 	}
 	IntegrityVerifier[] verifiers = null;
 	if (ref != null) {
-	    verifiers = (IntegrityVerifier[]) ref.get();
+	    verifiers = ref.get();
 	}
 	if (verifiers == null) {
-	    final ArrayList list = new ArrayList(1);
+	    final List<IntegrityVerifier> list = new LinkedList<IntegrityVerifier>();
 	    AccessController.doPrivileged(new PrivilegedAction() {
 		public Object run() {
-		    for (Iterator iter =
+		    for (Iterator<IntegrityVerifier> iter =
 			     Service.providers(IntegrityVerifier.class, cl);
 			 iter.hasNext(); )
 		    {
@@ -422,16 +456,15 @@ public final class Security {
 		    return null;
 		}
 	    });
-	    if (integrityLogger.isLoggable(Level.FINE)) {
-		integrityLogger.logp(Level.FINE, Security.class.getName(),
+	    if (getIntegrityLogger().isLoggable(Level.FINE)) {
+		getIntegrityLogger().logp(Level.FINE, Security.class.getName(),
 				     "verifyCodebaseIntegrity",
 				     "integrity verifiers {0}",
 				     new Object[]{list});
 	    }
-	    verifiers = (IntegrityVerifier[]) list.toArray(
-					  new IntegrityVerifier[list.size()]);
+	    verifiers = list.toArray( new IntegrityVerifier[list.size()]);
 	    synchronized (integrityMap) {
-		integrityMap.put(cl, new SoftReference(verifiers));
+		integrityMap.put(cl, new SoftReference<IntegrityVerifier[]>(verifiers));
 	    }
 	}
 	return verifiers;
@@ -487,7 +520,7 @@ public final class Security {
      * principals of the <code>Subject</code>, as well as the ability to use
      * credentials of the <code>Subject</code> for authentication.
      * 
-     * @param <T> 
+     * @param <T> type of object result from PrivilegedAction
      * @param action the action to be executed
      * @return the object returned by the action's <code>run</code> method
      * @throws NullPointerException if the action is <code>null</code>
@@ -497,6 +530,7 @@ public final class Security {
 	final AccessControlContext acc = AccessController.getContext();
 	return AccessController.doPrivileged(new PrivilegedAction<T>() {
             
+	    @Override
 	    public T run() {
 		return AccessController.doPrivileged(
 		    action, createPrivilegedContext(caller, acc));
@@ -518,7 +552,7 @@ public final class Security {
      * to principals of the <code>Subject</code>, as well as the ability to use
      * credentials of the <code>Subject</code> for authentication.
      * 
-     * @param <T> 
+     * @param <T> type of object result from PrivilegedExceptionAction
      * @param action the action to be executed
      * @return the object returned by the action's <code>run</code> method
      * @throws PrivilegedActionException if the action's <code>run</code>
@@ -532,6 +566,7 @@ public final class Security {
 	final AccessControlContext acc = AccessController.getContext();
 	return AccessController.doPrivileged(new PrivilegedExceptionAction<T>() {
             
+	    @Override
 	    public T run() throws Exception {
 		try {
 		    return AccessController.doPrivileged(
@@ -546,8 +581,13 @@ public final class Security {
     private static final Guard authPerm = new AuthPermission("doAsPrivileged");
     
     /**
-     * Performs work as a particular Subject in the presence of untrusted code,
+     * Performs work as a particular Subject in the presence of less privileged code,
      * for distributed systems.
+     * <p>
+     * In River / Jini, ProtectionDomain's of smart proxy's are used to represent
+     * remote services in the current thread call stack, it is important that
+     * these services are not granted additional privileges over and above that
+     * necessary, when run in a thread of a more privileged user (Subject).
      * <p>
      * This method retrieves the current Threads AccessControlContext and
      * using a SubjectDomainCombiner subclass, prepends a new ProtectionDomain
@@ -577,6 +617,7 @@ public final class Security {
      * privileges, only reduce them to those determined by a policy for a 
      * particular Subject.
      * <p>
+     * @param <T> type of object result from PrivilegedAction
      * @param subject  The Subject the work will be performed as, may be null.
      * @param action  The code to be run as the Subject.
      * @return   The value returned by the PrivilegedAction's run() method.
@@ -591,8 +632,13 @@ public final class Security {
     }
     
     /**
-     * Performs work as a particular Subject in the presence of untrusted code,
+     * Performs work as a particular Subject in the presence of less privileged code,
      * for distributed systems.
+     * <p>
+     * In River / Jini, ProtectionDomain's of smart proxy's are used to represent
+     * remote services in the current thread call stack, it is important that
+     * these services are not granted additional privileges over and above that
+     * necessary, when run in a thread of a more privileged user (Subject).
      * <p>
      * This method retrieves the current Thread AccessControlContext and
      * using a SubjectDomainCombiner subclass, prepends a new ProtectionDomain
@@ -626,11 +672,13 @@ public final class Security {
      * privileges, only reduce them to those determined by a policy for a 
      * particular Subject.
      * <p>
+     * @param <T> type of object result from PrivilegedExceptionAction
      * @param subject  The Subject the work will be performed as, may be null.
      * @param action  The code to be run as the Subject.
      * @return   The value returned by the PrivilegedAction's run() method.
      * @throws  NullPointerException if action is null;
-     * @throws PrivilegedActionException 
+     * @throws PrivilegedActionException if the specified action's run method
+     * throws a check exception.
      * @since 3.0.0
      */
     public static <T> T doAs(final Subject subject,
@@ -654,6 +702,7 @@ public final class Security {
      * Unlike Security.doAs which doesn't require any privileges, this method 
      * requires the same Permission as Subject.doAsPrivileged to execute.
      * 
+     * @param <T> type of object result from PrivilegedAction
      * @param subject  The Subject the work will be performed as, may be null.
      * @param action  The code to be run as the Subject.
      * @param context  The SecurityContext to be tied to the specific action
@@ -687,6 +736,7 @@ public final class Security {
      * Unlike Security.doAs which doesn't require any privileges, this method 
      * requires the same Permission as Subject.doAsPrivileged to execute.
      * 
+     * @param <T> type of object result from PrivilegedExceptionAction
      * @param subject  The Subject the work will be performed as, may be null.
      * @param action  The code to be run as the Subject.
      * @param context  The SecurityContext to be tied to the specific action
@@ -763,6 +813,46 @@ public final class Security {
 	Policy policy = getPolicy();
 	return (policy instanceof DynamicPolicy && 
 		((DynamicPolicy) policy).grantSupported());
+    }
+    
+    /**
+     * Returns <code>true</code> if the installed security policy provider
+     * supports dynamic revocable permission grants--i.e., if it implements the {@link
+     * RevocablePolicy} interface and calling its {@link
+     * RevocablePolicy#revokeSupported grantSupported} method returns
+     * <code>true</code>.  Returns <code>false</code> otherwise.
+     *
+     * @return <code>true</code> if the installed security policy provider
+     * supports dynamic permission grants
+     * @see #grant(Class,Permission[])
+     * @see #grant(Class,Principal[],Permission[])
+     * @see #grant(Class,Class)
+     */
+    public static boolean revocationSupported() {
+	Policy policy = getPolicy();
+	return (policy instanceof RevocablePolicy && 
+		((RevocablePolicy) policy).revokeSupported());
+    }
+    
+    /**
+     * Grant permissions contained by the <code>PermissionGrant</code> to
+     * those implied by the <code>PermissionGrant</code>.
+     * 
+     * @param grant 
+     * @throws UnsupportedOperationException if policy provider is not an
+     * instance of RevocablePolicy or revocation is not supported.
+     */
+    public static void grant(PermissionGrant grant) {
+	Policy policy = getPolicy();
+	if (!((policy instanceof RevocablePolicy)&& 
+		((RevocablePolicy) policy).revokeSupported())) {
+	    throw new UnsupportedOperationException("revocable grants not supported");
+	}
+	((RevocablePolicy) policy).grant(grant);
+	if (getPolicyLogger().isLoggable(Level.FINER)) {
+	    getPolicyLogger().log(Level.FINER, "granted {0}",
+		new Object[]{grant.toString()});
+	}
     }
 
     /**
@@ -867,8 +957,8 @@ public final class Security {
 	    throw new UnsupportedOperationException("grants not supported");
 	}
 	((DynamicPolicy) policy).grant(cl, principals, permissions);
-	if (policyLogger.isLoggable(Level.FINER)) {
-	    policyLogger.log(Level.FINER, "granted {0} to {1}, {2}",
+	if (getPolicyLogger().isLoggable(Level.FINER)) {
+	    getPolicyLogger().log(Level.FINER, "granted {0} to {1}, {2}",
 		new Object[]{
 		    (permissions != null) ? Arrays.asList(permissions) : null,
 		    (cl != null) ? cl.getName() : null,
@@ -925,8 +1015,8 @@ public final class Security {
 	    grantablePermissions(dpolicy.getGrants(fromClass, principals));
 
 	dpolicy.grant(toClass, principals, permissions);
-	if (policyLogger.isLoggable(Level.FINER)) {
-	    policyLogger.log(Level.FINER, "granted {0} from {1} to {2}, {3}",
+	if (getPolicyLogger().isLoggable(Level.FINER)) {
+	    getPolicyLogger().log(Level.FINER, "granted {0} from {1} to {2}, {3}",
 		new Object[]{
 		    (permissions != null) ? Arrays.asList(permissions) : null,
 		    fromClass.getName(), 
@@ -1028,7 +1118,8 @@ public final class Security {
 	/**
 	 * Weak map from ClassLoader to SoftReference(TrustVerifier[]).
 	 */
-	private static final WeakIdentityMap map = new WeakIdentityMap();
+	private static final Map<ClassLoader,SoftReference> map 
+		= new WeakHashMap<ClassLoader,SoftReference>();
 
 	/**
 	 * Creates an instance containing the trust verifiers found from
@@ -1063,8 +1154,8 @@ public final class Security {
 			return null;
 		    }
 		});
-		if (trustLogger.isLoggable(Level.FINE)) {
-		    trustLogger.logp(Level.FINE, Security.class.getName(),
+		if (getTrustLogger().isLoggable(Level.FINE)) {
+		    getTrustLogger().logp(Level.FINE, Security.class.getName(),
 				     "verifyObjectTrust",
 				     "trust verifiers {0}", list);
 		}
@@ -1088,8 +1179,8 @@ public final class Security {
 	    for (int i = 0; i < verifiers.length; i++) {
 		try {
 		    if (verifiers[i].isTrustedObject(obj, this)) {
-			if (trustLogger.isLoggable(Level.FINE)) {
-			    trustLogger.log(Level.FINE,
+			if (getTrustLogger().isLoggable(Level.FINE)) {
+			    getTrustLogger().log(Level.FINE,
 					    "{0} trusts {1}",
 					    new Object[]{verifiers[i], obj});
 			}
@@ -1099,8 +1190,8 @@ public final class Security {
 		    boolean rethrow = (e instanceof RuntimeException &&
 				       !(e instanceof SecurityException));
 		    Level level = rethrow ? Levels.FAILED : Levels.HANDLED;
-		    if (trustLogger.isLoggable(level)) {
-			logThrow(trustLogger, level,
+		    if (getTrustLogger().isLoggable(level)) {
+			logThrow(getTrustLogger(), level,
 				 this.getClass().getName(),
 				 "isTrustedObject",
 				 "{0} checking {1} throws",
@@ -1114,8 +1205,8 @@ public final class Security {
 		}
 	    }
 	    if (ex != null) {
-		if (trustLogger.isLoggable(Levels.FAILED)) {
-		    logThrow(trustLogger, Levels.FAILED,
+		if (getTrustLogger().isLoggable(Levels.FAILED)) {
+		    logThrow(getTrustLogger(), Levels.FAILED,
 			     this.getClass().getName(), "isTrustedObject",
 			     "checking {0} throws",
 			     new Object[]{obj}, ex);
@@ -1125,8 +1216,8 @@ public final class Security {
 		}
 		throw (SecurityException) ex;
 	    }
-	    if (trustLogger.isLoggable(Level.FINE)) {
-		trustLogger.log(Level.FINE, "no verifier trusts {0}", obj);
+	    if (getTrustLogger().isLoggable(Level.FINE)) {
+		getTrustLogger().log(Level.FINE, "no verifier trusts {0}", obj);
 	    }
 	    return false;
 	}

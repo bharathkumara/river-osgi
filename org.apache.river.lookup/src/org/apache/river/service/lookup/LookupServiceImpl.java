@@ -8,9 +8,10 @@ import java.util.logging.Logger;
 
 import org.apache.river.admin.DestroyAdmin;
 import org.apache.river.bootstrap.common.RiverCodeServer;
+import org.apache.river.start.NonActivatableServiceDescriptor;
+import org.apache.river.start.NonActivatableServiceDescriptor.Created;
 import org.apache.river.start.ServiceStarter;
-import org.apache.river.start.ext.SmartServiceDescriptor;
-import org.apache.river.start.ext.SmartServiceDescriptor.Created;
+
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
@@ -18,6 +19,10 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
+
+import net.jini.config.DynamicConfiguration;
+import net.jini.export.Exporter;
+import net.jini.jrmp.JrmpExporter;
 
 @Component(immediate = true, property = { "osgi.command.function=lookup", "osgi.command.scope=river" })
 public class LookupServiceImpl implements LookupService {
@@ -80,13 +85,30 @@ public class LookupServiceImpl implements LookupService {
 			String config = "reggie/jrmp-reggie.config";
 			URL url = context.getBundle().getEntry(config);
 			String configLocation = url.toExternalForm();
+			URL classpath = context.getBundle().getEntry(importCodebase);
+			URL url2 = classpath.toURI().toURL();
+			
 
-			SmartServiceDescriptor descriptor = new SmartServiceDescriptor(context.getBundle(), codebase, "",
-					importCodebase, "org.apache.river.reggie.TransientRegistrarImpl", new String[] { configLocation });
-			Created created = (Created) descriptor.create();
-			lookupService = (DestroyAdmin) created.impl;
-			System.out.println("Lookup service is started");
-			serviceStarted = true;
+			ClassLoader oldCCL = Thread.currentThread().getContextClassLoader();
+			try {
+				Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+				NonActivatableServiceDescriptor desc = new NonActivatableServiceDescriptor(codebase, "file:/C:/Users/H182933/.java.policy", classpath.toString(),
+						"org.apache.river.reggie.TransientRegistrarImpl", new String[] { configLocation });
+				
+
+				DynamicConfiguration con = new DynamicConfiguration();
+				con.setEntry("org.apache.river.reggie", "serverExporter", Exporter.class, new JrmpExporter());
+				con.setEntry("org.apache.river.reggie", "initialMemberGroups", String[].class, new String[] { "nonsecure.hello.example.jini.sun.com" });
+				Created created = (Created) desc.create(con);
+				lookupService = (DestroyAdmin) created.impl;
+				System.out.println("Lookup service is started");
+				serviceStarted = true;
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} finally{
+				Thread.currentThread().setContextClassLoader(oldCCL);
+			}
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -115,7 +137,9 @@ public class LookupServiceImpl implements LookupService {
 
 	@Deactivate
 	public void deactivate() {
+		stop();
 		this.context = null;
+		
 	}
 
 }

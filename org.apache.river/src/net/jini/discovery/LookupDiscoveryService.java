@@ -17,11 +17,10 @@
  */
 package net.jini.discovery;
 
+import java.rmi.MarshalledObject;
+import java.rmi.RemoteException;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.event.RemoteEventListener;
-
-import java.rmi.RemoteException;
-import java.rmi.MarshalledObject;
 
 /**
  * Defines the interface to the lookup discovery service. This interface is 
@@ -143,7 +142,9 @@ public interface LookupDiscoveryService {
      * @throws java.lang.IllegalArgumentException this exception occurs when
      *         the value input to the <code>leaseDuration</code> parameter
      *         is neither positive, Lease.FOREVER, nor Lease.ANY.
+     * @deprecated use {@link LookupDiscoveryServiceSafely#register(java.lang.String[], net.jini.core.discovery.LookupLocator[], net.jini.core.event.RemoteEventListener, net.jini.io.MarshalledInstance, long) }
      */
+    @Deprecated 
     public LookupDiscoveryRegistration register(String[] groups,
                                                 LookupLocator[] locators,
                                                 RemoteEventListener listener,

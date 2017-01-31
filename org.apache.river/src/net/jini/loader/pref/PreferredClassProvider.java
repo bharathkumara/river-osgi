@@ -18,12 +18,6 @@
 
 package net.jini.loader.pref;
 
-import org.apache.river.concurrent.RC;
-import org.apache.river.concurrent.Ref;
-import org.apache.river.concurrent.Referrer;
-import org.apache.river.action.GetPropertyAction;
-import org.apache.river.logging.Levels;
-import org.apache.river.logging.LogUtil;
 import java.io.FilePermission;
 import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
@@ -33,8 +27,8 @@ import java.lang.reflect.Proxy;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLConnection;
 import java.net.URLClassLoader;
+import java.net.URLConnection;
 import java.rmi.server.RMIClassLoader;
 import java.rmi.server.RMIClassLoaderSpi;
 import java.security.AccessController;
@@ -42,28 +36,40 @@ import java.security.CodeSource;
 import java.security.Permission;
 import java.security.PermissionCollection;
 import java.security.Permissions;
+import java.security.Policy;
 import java.security.PrivilegedAction;
+import java.security.ProtectionDomain;
+import java.security.cert.Certificate;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import net.jini.loader.ClassAnnotation;
-import net.jini.loader.ClassLoading;
 import net.jini.loader.DownloadPermission;
 import net.jini.loader.LoadClass;
+import org.apache.river.action.GetPropertyAction;
 import org.apache.river.api.net.Uri;
+import org.apache.river.concurrent.RC;
+import org.apache.river.concurrent.Ref;
+import org.apache.river.concurrent.Referrer;
+import org.apache.river.logging.Levels;
+import org.apache.river.logging.LogUtil;
 
 /**
  * An <code>RMIClassLoader</code> provider that supports preferred
  * classes.
  *
- * <p>See the {@link RMIClassLoader} specification for information
+ * <p>See the {@link RMIClassLoader} specification and 
+ * {@link net.jini.loader.ClassLoading} for information
  * about how to install and configure the <code>RMIClassLoader</code>
  * service provider.
  *
@@ -264,8 +270,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 	    codebaseAnnotationProperty = prop;
 	}
         if (codebaseAnnotationProperty == null) uri = true;
-        else if ("URL".equalsIgnoreCase(codebaseAnnotationProperty)) uri = false;
-        else uri = true;
+        else uri = !"URL".equalsIgnoreCase(codebaseAnnotationProperty);
     }
 
     /** encodings for primitive array class element types */
@@ -283,7 +288,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 
     private static final Permission getClassLoaderPermission =
 	new RuntimePermission("getClassLoader");
-
+    
     /**
      * value of "java.rmi.server.codebase" property, as cached at class
      * initialization time.  It may contain malformed URLs.
@@ -303,6 +308,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
         Set<Referrer<ClassLoader>> internal = Collections.newSetFromMap(new ConcurrentHashMap<Referrer<ClassLoader>,Boolean>());
         localLoaders = RC.set(internal, Ref.WEAK_IDENTITY, 10000L);
 	AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
+	    @Override
 	    public ClassLoader run() {
 		for (ClassLoader loader = ClassLoader.getSystemClassLoader();
 		     loader != null;
@@ -393,8 +399,8 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 	    sm.checkCreateClassLoader();
 	}
 	this.requireDlPerm = requireDlPerm;
-        ConcurrentMap<Referrer<ClassLoader>,Referrer<PermissionCollection>> inter =
-                new ConcurrentHashMap<Referrer<ClassLoader>,Referrer<PermissionCollection>>();
+        ConcurrentMap<Referrer<ClassLoader>,Referrer<Collection<Permission>>> inter =
+                new ConcurrentHashMap<Referrer<ClassLoader>,Referrer<Collection<Permission>>>();
         classLoaderPerms = RC.concurrentMap(inter, Ref.WEAK_IDENTITY, Ref.STRONG, 5000L, 5000L);
 	initialized = true;
     }
@@ -409,7 +415,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
      * Map to hold permissions needed to check the URLs of
      * URLClassLoader objects.
      */
-    private final ConcurrentMap<ClassLoader,PermissionCollection> classLoaderPerms ;
+    private final ConcurrentMap<ClassLoader,Collection<Permission>> classLoaderPerms ;
     
     /*
      * Check permissions to load from the specified loader.  The
@@ -433,18 +439,22 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 		((PreferredClassLoader) loader).checkPermissions();
 		
 	    } else {
-		PermissionCollection perms = classLoaderPerms.get(loader);
+		Collection<Permission> perms = classLoaderPerms.get(loader);
                 if (perms == null) {
-                    perms = new Permissions();
+		    PermissionCollection permiss = new Permissions();
                     // long operation so we don't want to synchronize here.
                     PreferredClassLoader.addPermissionsForURLs(
-                        urls, perms, false);
-                    perms.setReadOnly();
+                        urls, permiss, false);
+		    perms = new LinkedList<Permission>();
+		    Enumeration<Permission> en = permiss.elements();
+		    while(en.hasMoreElements()){
+			perms.add(en.nextElement());
+		    }
                     classLoaderPerms.putIfAbsent(loader, perms);// doesn't matter if they existed.
                 }
-                Enumeration<Permission> en = perms.elements();
-                while (en.hasMoreElements()) {
-                    sm.checkPermission(en.nextElement());
+                Iterator<Permission> it = perms.iterator();
+                while (it.hasNext()) {
+                    sm.checkPermission(it.next());
                 }
 	    }
 	}
@@ -529,6 +539,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
      * @throws ClassNotFoundException if a definition for the class
      * could not be loaded
      **/
+    @Override
     public Class loadClass(String codebase,
 			   String name,
 			   ClassLoader defaultLoader)
@@ -780,6 +791,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
      * @return the annotation string for the class, or
      * <code>null</code>
      **/
+    @Override
     public String getClassAnnotation(Class cl) {
 	checkInitialized();
 	String name = cl.getName();
@@ -870,7 +882,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 			SecurityManager sm = System.getSecurityManager();
 			if (sm != null) {
 			    Permissions perms = new Permissions();
-			    for (int i = 0; i < urls.length; i++) {
+			    for (int i = 0, l = urls.length; i < l; i++) {
 				Permission p =
 				    urls[i].openConnection().getPermission();
 				if (p != null) {
@@ -889,6 +901,11 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 		 * If access was denied to the knowledge of the class
 		 * loader's URLs, fall back to the default behavior.
 		 */
+                logger.log(
+                    Level.FINE,
+                    "Access denied to knowledge of class loader's URL's",
+                    e
+                );
 	    } catch (IOException e) {
 		/*
 		 * This shouldn't happen, although it is declared to be
@@ -896,6 +913,11 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 		 * does happen, forget about this class loader's URLs and
 		 * fall back to the default behavior.
 		 */
+                logger.log(
+                    Level.FINE, 
+                    "IOException thrown while attempting to access class loader's URL's",
+                    e
+                );
 	    }
 	}
 
@@ -949,6 +971,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
      * permissions necessary to connect to all of the URLs in the
      * codebase URL path
      **/
+    @Override
     public ClassLoader getClassLoader(String codebase)
 	throws MalformedURLException
     {
@@ -1112,6 +1135,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
      * <code>IllegalArgumentException</code> for the given interface
      * list)
      **/
+    @Override
     public Class loadProxyClass(String codebase,
 				String[] interfaceNames,
 				ClassLoader defaultLoader)
@@ -1355,7 +1379,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 				       String codebase)
 	throws ClassNotFoundException
     {
-	for (int p = 0; p < interfaceNames.length; p++) {
+	for (int p = 0, l = interfaceNames.length; p < l; p++) {
 	    try {
 		if (((PreferredClassLoader) codebaseLoader).
 		    isPreferredResource(interfaceNames[p], true))
@@ -1474,9 +1498,9 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 	urls = new Uri[st.countTokens()];
 	for (int i = 0; st.hasMoreTokens(); i++) {
             try {
-                String uri = st.nextToken();
-                uri = Uri.fixWindowsURI(uri);
-                urls[i] = Uri.parseAndCreate(uri);
+                String ur = st.nextToken();
+                ur = Uri.fixWindowsURI(ur);
+                urls[i] = Uri.parseAndCreate(ur);
             } catch (URISyntaxException ex) {
                 throw new MalformedURLException("URL's must be RFC 3986 Compliant: " 
                         + ex.getMessage());
@@ -1524,6 +1548,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 	 */
 	return AccessController.doPrivileged(
             new PrivilegedAction<ClassLoader>() {
+	      @Override
               public ClassLoader run() {
                   return Thread.currentThread().getContextClassLoader();
               }
@@ -1581,6 +1606,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
     {
 	return AccessController.doPrivileged(
             new PrivilegedAction<ClassLoader>() {
+	      @Override
               public ClassLoader run() {
                   return findOriginLoader0(pathURLs, parent);
               }
@@ -1636,7 +1662,9 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 	 */
 	if (uris == null) {
             if (logger.isLoggable(Level.FINEST)){
-                logger.log(Level.FINEST, "uri string is null, returning parent ClassLoader: " + parent);
+                logger.log(Level.FINEST, 
+			"uri string is null, returning parent ClassLoader: {0}", 
+			parent);
             }
 	    return parent;
 	}
@@ -1657,8 +1685,8 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 	 */
         
         if (logger.isLoggable(Level.FINEST)){
-            String uriString = null;
-            String urlString = null;
+            String uriString;
+            String urlString;
             StringBuilder sb = new StringBuilder(120);
             sb.append("Uri[]: ");
             int l = uris.length;
@@ -1786,6 +1814,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 	checkInitialized();
 	return
 	    AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
+		@Override
 		public ClassLoader run() {
 		    return new PreferredClassLoader(urls, parent, null,
 						    requireDlPerm);
@@ -1835,10 +1864,12 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 	    hashValue = h;
 	}
 
+	@Override
 	public int hashCode() {
 	    return hashValue;
 	}
 
+	@Override
 	public boolean equals(Object obj) {
 	    if (obj == this) return true;
 	    if (!(obj instanceof LoaderKey)) return false;
@@ -1851,6 +1882,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
 		&& Arrays.equals(uris, other.uris);
 	}
         
+	@Override
         public String toString(){
             StringBuilder sb = new StringBuilder(120);
             int l = uris.length;
@@ -1875,6 +1907,7 @@ public class PreferredClassProvider extends RMIClassLoaderSpi {
     private static ClassLoader getClassLoader(final Class c) {
 	return AccessController.doPrivileged(
 	    new PrivilegedAction<ClassLoader>() {
+		@Override
 		public ClassLoader run() { return c.getClassLoader(); }
 	    });
     }

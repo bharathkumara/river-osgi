@@ -21,7 +21,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.Spliterator;
 
 /**
  *This class is the serial form of ReferenceCollection and all it's subclasses.
@@ -85,11 +84,5 @@ import java.util.Spliterator;
     private void writeObject(ObjectOutputStream out) throws IOException {
         out.defaultWriteObject();
     }
-
-	@Override
-	public Spliterator<T> spliterator() {
-		// TODO Auto-generated method stub
-		return super.spliterator();
-	}
     
 }

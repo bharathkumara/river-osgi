@@ -58,7 +58,7 @@ import org.apache.river.api.security.DefaultPolicyScanner.PermissionEntry;
  * <p>
  * A DelegatePermission requires a method guard delegate to encapsulate a privileged
  * resource. The developer is responsible for developing the method guard wrapper, an 
- * example for SocketFactory can be found on Apache River's svn.
+ * example for SocketFactory can be found on River-Internet's svn.
  * <p>
  * A method guard delegates ProtectionDomain is granted the 
  * candidate permission, the security delegate allows any user granted a
@@ -295,7 +295,7 @@ public final class DelegatePermission extends Permission{
 
 	    return (PermissionEntry[]) l.toArray(new PermissionEntry[l.size()]);
 	} catch (IOException ex) {
-	    throw (Error) new InternalError().initCause(ex);
+	    throw new InternalError(ex);
 	}
     }
 

@@ -19,6 +19,7 @@
 package net.jini.security.proxytrust;
 
 import java.rmi.RemoteException;
+import java.util.NoSuchElementException;
 
 /**
  * Defines an iterator that produces objects from which a
@@ -35,6 +36,7 @@ import java.rmi.RemoteException;
  * 
  * @since 2.0
  */
+@Deprecated
 public interface ProxyTrustIterator {
     /**
      * Returns <code>true</code> if the iteration has more elements, and

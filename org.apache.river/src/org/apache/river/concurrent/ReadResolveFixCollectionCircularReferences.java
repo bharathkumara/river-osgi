@@ -31,6 +31,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +44,8 @@ import java.util.concurrent.TimeUnit;
  * 
  * @author Peter Firmstone.
  */
-abstract class ReadResolveFixCollectionCircularReferences<T> extends SerializationOfReferenceCollection<T>
+abstract class ReadResolveFixCollectionCircularReferences<T> 
+extends SerializationOfReferenceCollection<T>
 implements List<T>, Set<T>, SortedSet<T>, NavigableSet<T> , 
 Queue<T>, Deque<T>, BlockingQueue<T>, BlockingDeque<T>{
    
@@ -165,6 +167,10 @@ Queue<T>, Deque<T>, BlockingQueue<T>, BlockingDeque<T>{
     public Iterator<T> iterator(){
         if (getSerialBuilt() != null) return getSerialBuilt().iterator();
         return new NullIterator<T>();
+    }
+    
+    public Spliterator<T> spliterator() {
+        return Spliterators.spliterator(this, Spliterator.ORDERED);
     }
     
     @Override
@@ -603,12 +609,6 @@ Queue<T>, Deque<T>, BlockingQueue<T>, BlockingDeque<T>{
             return ((BlockingDeque<T>) getSerialBuilt()).pollLast(timeout, unit);
         throw new UnsupportedOperationException("Unsupported Interface Method.");
     }
-
-	@Override
-	public Spliterator<T> spliterator() {
-		// TODO Auto-generated method stub
-		return super.spliterator();
-	}
 
  
 }

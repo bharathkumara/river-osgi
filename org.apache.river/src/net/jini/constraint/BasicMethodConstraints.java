@@ -22,15 +22,17 @@ import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.ObjectOutputStream.PutField;
 import java.io.ObjectStreamField;
 import java.io.Serializable;
 import java.lang.reflect.Method;
-import java.rmi.RemoteException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import net.jini.core.constraint.InvocationConstraints;
 import net.jini.core.constraint.MethodConstraints;
+import org.apache.river.api.io.AtomicSerial;
+import org.apache.river.api.io.AtomicSerial.GetArg;
 
 /**
  * Basic implementation of {@link MethodConstraints}, allowing limited
@@ -48,6 +50,7 @@ import net.jini.core.constraint.MethodConstraints;
  * 
  * @since 2.0
  */
+@AtomicSerial
 public final class BasicMethodConstraints
 			implements MethodConstraints, Serializable
 {
@@ -77,6 +80,7 @@ public final class BasicMethodConstraints
      *
      * @since 2.0
      */
+    @AtomicSerial
     public static final class MethodDesc implements Serializable {
 	private static final long serialVersionUID = 6773269226844208999L;
 
@@ -117,6 +121,31 @@ public final class BasicMethodConstraints
 	 */
 	final InvocationConstraints constraints;
 
+	private MethodDesc(boolean check, 
+			   String name,
+			   Class[] types,
+			   InvocationConstraints constraints)
+	{
+	    this.name = name;
+	    this.types = types == null ? null : (Class[]) types.clone();
+	    if (constraints != null && constraints.isEmpty()) {
+		constraints = null;
+	    }
+	    this.constraints = constraints;
+	}
+	
+	public MethodDesc(GetArg arg) throws IOException{
+	    this(checkSerial(
+		    arg.get("name", null, String.class),
+		    arg.get("types", null, Class[].class),
+		    arg.get("constraints", null, InvocationConstraints.class)
+		),
+		(String) arg.get("name", null),
+		(Class[]) arg.get("types", null),
+		(InvocationConstraints) arg.get("constraints", null)
+	    );
+	}
+
 	/**
 	 * Creates a descriptor that only matches methods with exactly the
 	 * specified name and parameter types. The constraints can be
@@ -139,14 +168,12 @@ public final class BasicMethodConstraints
 			  Class[] types,
 			  InvocationConstraints constraints)
 	{
-	    this.name = name;
-	    this.types = (Class[]) types.clone();
-	    if (constraints != null && constraints.isEmpty()) {
-		constraints = null;
+	    this(check(name, types),
+		name,
+		types,
+		constraints
+	    );
 	    }
-	    this.constraints = constraints;
-	    check();
-	}
 
 	/**
 	 * Creates a descriptor that matches all methods with names that
@@ -169,13 +196,43 @@ public final class BasicMethodConstraints
 	 * match any syntactically valid method name
 	 */
 	public MethodDesc(String name, InvocationConstraints constraints) {
-	    this.name = name;
-	    this.types = null;
-	    if (constraints != null && constraints.isEmpty()) {
-		constraints = null;
+	    this(check(name, null),
+		name,
+		null,
+		constraints
+	    );
+	}
+	
+	/**
+	 * Invariant checks for de-serialization.
+	 * @param name
+	 * @param types
+	 * @param constraints
+	 * @return
+	 * @throws InvalidObjectException 
+	 */
+	private static boolean checkSerial(
+		String name, 
+		Class[] types,
+		InvocationConstraints constraints) throws InvalidObjectException
+	{
+	    if (name == null) {
+		if (types != null) {
+		    throw new InvalidObjectException(
+					 "cannot have types with null name");
+		}
+	    } else {
+		try {
+		    check(name, types);
+		} catch (RuntimeException e) {
+		    rethrow(e);
+		}
 	    }
-	    this.constraints = constraints;
-	    check();
+	    if (constraints != null && constraints.isEmpty()) {
+		throw new InvalidObjectException(
+					     "constraints cannot be empty");
+	    }
+	    return true;
 	}
 
 	/**
@@ -186,7 +243,7 @@ public final class BasicMethodConstraints
 	 * the first character of that name with '*', and verifies that none
 	 * of the elements of types are null.
 	 */
-	private void check() {
+	private static boolean check(String name, Class[] types) {
 	    boolean star = types == null;
 	    int len = name.length();
 	    if (len == 0) {
@@ -214,6 +271,7 @@ public final class BasicMethodConstraints
 		    }
 		}
 	    }
+	    return true;
 	}
 
 	/**
@@ -224,13 +282,12 @@ public final class BasicMethodConstraints
 	 * @param constraints the constraints, or <code>null</code>
 	 */
 	public MethodDesc(InvocationConstraints constraints) {
-	    this.name = null;
-	    this.types = null;
-	    if (constraints != null && constraints.isEmpty()) {
-		constraints = null;
+	     this(false,
+		null,
+		null,
+		constraints
+	    );
 	    }
-	    this.constraints = constraints;
-	}
 
 	/**
 	 * Returns the name of the method, with a prefix or suffix '*' if the
@@ -352,24 +409,9 @@ public final class BasicMethodConstraints
 	    throws IOException, ClassNotFoundException
 	{
 	    s.defaultReadObject();
-	    if (name == null) {
-		if (types != null) {
-		    throw new InvalidObjectException(
-					 "cannot have types with null name");
-		}
-	    } else {
-		try {
-		    check();
-		} catch (RuntimeException e) {
-		    rethrow(e);
-		}
-	    }
-	    if (constraints != null && constraints.isEmpty()) {
-		throw new InvalidObjectException(
-					     "constraints cannot be empty");
-	    }
-	}
-    }
+	    checkSerial(name, types, constraints);
+            }
+        }
 
     /**
      * Creates an instance with the specified ordered array of descriptors.
@@ -389,8 +431,37 @@ public final class BasicMethodConstraints
      * least the same methods
      */
     public BasicMethodConstraints(MethodDesc[] descs) {
+	this(check(descs), descs);
+    }
+    
+    /**
+     * Constructor for {@link AtomicSerial}.
+     * 
+     * @see AtomicSerial
+     * @param arg
+     * @throws IOException 
+     */
+    public BasicMethodConstraints(GetArg arg) throws IOException{
+	this(checkSerial(arg.get("descs", null, MethodDesc[].class)),
+	    (MethodDesc[]) arg.get("descs", null));
+    }
+    
+    /**
+     * Private constructor to call after invariant checks.
+     * @param check
+     * @param descs 
+     */
+    private BasicMethodConstraints(boolean check, MethodDesc[] descs){
 	this.descs = (MethodDesc[]) descs.clone();
-	check();
+    }
+
+    private static boolean checkSerial(MethodDesc[] descs) throws InvalidObjectException{
+	try {
+	    return check(descs);
+	} catch (RuntimeException e) {
+	    rethrow(e);
+	}
+	return true;
     }
 
     /**
@@ -399,7 +470,7 @@ public final class BasicMethodConstraints
      * least the same methods. Throws NullPointerException if the array or
      * any element is null.
      */
-    private void check() {
+    private static boolean check(MethodDesc[] descs) {
 	if (descs.length == 0) {
 	    throw new IllegalArgumentException(
 					 "must have at least one descriptor");
@@ -458,6 +529,7 @@ public final class BasicMethodConstraints
 		}
 	    }
 	}
+	return true;
     }
 
     /**
@@ -622,23 +694,26 @@ public final class BasicMethodConstraints
 		 Arrays.equals(descs, ((BasicMethodConstraints) obj).descs)));
     }
 
+    private void writeObject(ObjectOutputStream out) throws IOException {
+	out.defaultWriteObject();
+    }
+
     /**
      * Verifies legal descriptor ordering.
      *
      * @throws InvalidObjectException if any descriptor is <code>null</code>,
      * or the descriptors array is empty, or if any descriptor is preceded by
      * another descriptor that matches at least the same methods
+     * 
+     * Default de-serialization is vulnerable to finalizer and reference
+     * stealer attacks.
      */
     private void readObject(ObjectInputStream s)
 	throws IOException, ClassNotFoundException
     {
 	s.defaultReadObject();
-	try {
-	    check();
-	} catch (RuntimeException e) {
-	    rethrow(e);
+	checkSerial(descs);
 	}
-    }
 
     /**
      * Returns the sum of the hash codes of all elements of the given array.

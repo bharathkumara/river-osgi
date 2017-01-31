@@ -17,6 +17,18 @@
  */
 package net.jini.core.lookup;
 
+import java.io.IOException;
+import java.io.InvalidObjectException;
+import java.io.ObjectOutputStream;
+//import net.jini.core.entry.Entry;
+//import net.jini.export.ServiceAttributesAccessor;
+//import net.jini.export.ServiceIDAccessor;
+//import net.jini.export.ServiceProxyAccessor;
+import net.jini.io.MarshalledInstance;
+//import net.jini.security.ProxyPreparer;
+import org.apache.river.api.io.AtomicSerial;
+import org.apache.river.api.io.AtomicSerial.GetArg;
+
 /**
  * This class is used for remote events sent by the lookup service.  It
  * extends RemoteEvent with methods to obtain the service ID of the matched
@@ -33,6 +45,7 @@ package net.jini.core.lookup;
  *
  * @since 1.0
  */
+@AtomicSerial
 public abstract class ServiceEvent extends net.jini.core.event.RemoteEvent {
 
     private static final long serialVersionUID = 1304997274096842701L;
@@ -42,13 +55,35 @@ public abstract class ServiceEvent extends net.jini.core.event.RemoteEvent {
      *
      * @serial
      */
-    protected ServiceID serviceID;
+    protected final ServiceID serviceID;
     /**
      * One of ServiceRegistrar.TRANSITION_*MATCH_*MATCH.
      *
      * @serial
      */
-    protected int transition;
+    protected final int transition;
+
+    private static GetArg check(GetArg arg) throws IOException {
+	Object serviceID = arg.get("serviceID", null); // Type check
+	if ( serviceID != null && !(serviceID instanceof ServiceID)) throw new ClassCastException();
+	int transition = arg.get("transition", 0);
+	switch (transition){
+	    case ServiceRegistrar.TRANSITION_MATCH_MATCH:
+		return arg;
+	    case ServiceRegistrar.TRANSITION_MATCH_NOMATCH:
+		return arg;
+	    case ServiceRegistrar.TRANSITION_NOMATCH_MATCH:
+		return arg;
+	    default:
+		throw new InvalidObjectException("transition state is illegal");
+	}
+    }
+    
+    public ServiceEvent(GetArg arg) throws IOException{
+	super(check(arg));
+	serviceID = (ServiceID) arg.get("serviceID", null);
+	transition = arg.get("transition", 0);
+    }
 
     /**
      * Simple constructor.
@@ -60,6 +95,7 @@ public abstract class ServiceEvent extends net.jini.core.event.RemoteEvent {
      * @param serviceID the serviceID of the item that triggered the event
      * @param transition the transition that triggered the event
      */
+    @Deprecated
     public ServiceEvent(Object source,
 			long eventID,
 			long seqNo,
@@ -68,6 +104,28 @@ public abstract class ServiceEvent extends net.jini.core.event.RemoteEvent {
 			int transition)
     {
 	super(source, eventID, seqNo, handback);
+	this.serviceID = serviceID;
+	this.transition = transition;
+    }
+    
+    /**
+     * Simple constructor.
+     *
+     * @param source the source of this ServiceEvent
+     * @param eventID the registration eventID
+     * @param seqNo the sequence number of this event
+     * @param miHandback the client handback
+     * @param serviceID the serviceID of the item that triggered the event
+     * @param transition the transition that triggered the event
+     */
+    public ServiceEvent(Object source,
+			long eventID,
+			long seqNo,
+			MarshalledInstance miHandback,
+			ServiceID serviceID,
+			int transition)
+    {
+	super(source, eventID, seqNo, miHandback);
 	this.serviceID = serviceID;
 	this.transition = transition;
     }
@@ -117,21 +175,67 @@ public abstract class ServiceEvent extends net.jini.core.event.RemoteEvent {
 	sBuffer.append(", source=").append(getSource()).append(
 	    ", eventID=").append(getID()).append(
 	    ", seqNum=").append(getSequenceNumber()).append(
-	    ", handback=").append(getRegistrationObject());
+	    ", handback=").append(getRegistrationObject()).append(
+	    ", miHandback=").append(getRegistrationInstance());
 	return sBuffer.append("]").toString();
     }
 
     /**
      * Returns the new state of the item, or null if the item was deleted
      * from the lookup service.
+     * 
+     * It is preferable to delay unmarshalling the service proxy until this method
+     * is called.
      *
      * @return a <tt>ServiceItem</tt> object representing the service item value
      */
     public abstract ServiceItem getServiceItem();
     
+//    /**
+//     * Convenience method that creates a ServiceItem, using a bootstrap proxy
+//     * to communicate directly with the services origin server node, to authenticate,
+//     * then download the current service proxy and attributes.
+//     * 
+//     * @param bootstrapProxyPrep
+//     * @param serviceProxyPrep
+//     * @return
+//     * @throws IOException 
+//     */
+//    public ServiceItem getServiceItem(ProxyPreparer bootstrapProxyPrep,
+//	    ProxyPreparer serviceProxyPrep) throws IOException 
+//    {
+//	Object proxy = getBootstrapProxy();
+//	if (proxy == null) return null;
+//	proxy = bootstrapProxyPrep.prepareProxy(proxy);
+//	Object service = ((ServiceProxyAccessor) proxy).getServiceProxy();
+//	service = serviceProxyPrep.prepareProxy(service);
+//	Entry [] attributes = ((ServiceAttributesAccessor) proxy).getServiceAttributes();
+//	ServiceID id = ((ServiceIDAccessor) proxy).serviceID();
+//	return new ServiceItem(id, service, attributes);
+//    }
+    
+    /**
+     * Returns a bootstrap proxy from which the new state of the item can be
+     * retrieved.
+     * 
+     * The returned bootstrap proxy should be prepared prior to use.
+     * 
+     * @return a bootstrap proxy.
+     */
+    public Object getBootstrapProxy(){
+	return null;
+    }
+    
+    private void writeObject(ObjectOutputStream out) throws IOException {
+	out.defaultWriteObject();
+    }
+    
     /**
      * Serialization evolution support
-     * @serialData 
+     * @serial 
+     * @param stream ObjectInputStream
+     * @throws ClassNotFoundException if class not found.
+     * @throws java.io.IOException if a problem occurs during de-serialization.
      */
     private void readObject(java.io.ObjectInputStream stream)
 	throws java.io.IOException, ClassNotFoundException

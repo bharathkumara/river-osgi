@@ -73,7 +73,7 @@ class SslEndpointImpl extends Utilities implements ConnectionEndpoint {
     /* -- Fields -- */
 
     /** Client logger */
-    static final Logger logger = clientLogger;
+    static final Logger logger = CLIENT_LOGGER;
 
     /**
      * Weak key map that maps connection endpoints to weak references to the
@@ -106,17 +106,20 @@ class SslEndpointImpl extends Utilities implements ConnectionEndpoint {
      * Whether to disable calling Socket.connect -- set when used by discovery
      * providers.
      */
-    boolean disableSocketConnect;
+    volatile boolean disableSocketConnect;
 
-    /** A cache for recently computed connection contexts. */
-    private ConnectionContextCache[] connectionContextCache =
+    /** A cache for recently computed connection contexts. All access synchronized*/
+    private final ConnectionContextCache[] connectionContextCache =
 	new ConnectionContextCache[CACHE_SIZE];
 
-    /** Next index for a connectionContextCache miss; counts down, not up. */
+    /** Next index for a connectionContextCache miss; counts down, not up. 
+     *  Access synchronized on connectionContextCache
+     */
     private int cacheNext;
 
-    /** The connection manager for this endpoint or null if not yet set. */
-    ConnManager connectionManager;
+    /** The connection manager for this endpoint or null if not yet set. 
+     *  All access to reference synchronized on connectionMgrs */
+    private ConnManager connectionManager;
 
     /* -- Constructors -- */
 
@@ -127,13 +130,7 @@ class SslEndpointImpl extends Utilities implements ConnectionEndpoint {
 		    SocketFactory socketFactory)
     {
 	this.endpoint = endpoint;
-	if (serverHost == null) {
-	    throw new NullPointerException("serverHost is null");
-	}
 	this.serverHost = serverHost;
-	if (port <= 0 || port > 0xFFFF) {
-	    throw new IllegalArgumentException("Invalid port: " + port);
-	}
 	this.port = port;
 	this.socketFactory = socketFactory;
     }
@@ -191,6 +188,17 @@ class SslEndpointImpl extends Utilities implements ConnectionEndpoint {
 	} catch (SecurityException e) {
 	    return new ExceptionOutboundRequestIterator(e);
 	}
+    }
+
+    /**
+     * @param connectionManager the connectionManager to set
+     */
+    void setConnectionManager(ConnManager connectionManager) {
+        synchronized (connectionMgrs){
+            this.connectionManager = connectionManager;
+            connectionMgrs.put(
+                            this, new WeakReference(connectionManager));
+        }
     }
 
     /**
@@ -569,7 +577,7 @@ class SslEndpointImpl extends Utilities implements ConnectionEndpoint {
 	SecurityManager sm = System.getSecurityManager();
 	if (sm != null) {
 	    try {
-		sm.checkPermission(getSubjectPermission);
+		sm.checkPermission(GET_SUBJECT_PERMISSION);
 	    } catch (SecurityException e) {
 		return Boolean.FALSE;
 	    }

@@ -18,14 +18,10 @@
 
 package org.apache.river.discovery.internal;
 
-import org.apache.river.discovery.ClientSubjectChecker;
-import org.apache.river.discovery.DiscoveryProtocolException;
-import org.apache.river.discovery.UnicastDiscoveryServer;
-import org.apache.river.discovery.UnicastResponse;
-import org.apache.river.jeri.internal.connection.ServerConnManager;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -37,11 +33,16 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import javax.net.ServerSocketFactory;
 import javax.security.auth.Subject;
 import net.jini.core.constraint.InvocationConstraints;
+import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.export.ProxyAccessor;
+import net.jini.export.ServiceCodebaseAccessor;
 import net.jini.io.UnsupportedConstraintException;
+import net.jini.io.context.AtomicValidationEnforcement;
 import net.jini.io.context.ClientSubject;
 import net.jini.jeri.InboundRequest;
 import net.jini.jeri.RequestDispatcher;
@@ -52,6 +53,11 @@ import net.jini.jeri.ServerEndpoint.ListenEndpoint;
 import net.jini.jeri.ServerEndpoint.ListenHandle;
 import net.jini.jeri.connection.InboundRequestHandle;
 import net.jini.jeri.connection.ServerConnection;
+import org.apache.river.discovery.ClientSubjectChecker;
+import org.apache.river.discovery.DiscoveryProtocolException;
+import org.apache.river.discovery.UnicastDiscoveryServer;
+import org.apache.river.discovery.UnicastResponse;
+import org.apache.river.jeri.internal.connection.ServerConnManager;
 
 /**
  * Provides an abstract server endpoint-based UnicastDiscoveryServer
@@ -81,7 +87,9 @@ public abstract class EndpointBasedServer
 	    constraints = InvocationConstraints.EMPTY;
 	}
 	ServerEndpoint ep = getServerEndpoint(null);
-	checkIntegrity(ep.checkConstraints(constraints));
+	InvocationConstraints unfulfilled = ep.checkConstraints(constraints);
+	checkIntegrity(unfulfilled);
+	checkAtomicity(unfulfilled);
     }
 
     // documentation inherited from UnicastDiscoveryServer
@@ -115,7 +123,21 @@ public abstract class EndpointBasedServer
 	    OutputStream out = new BufferedOutputStream(conn.getOutputStream());
 	    InboundRequestHandle handle = conn.processRequestData(in, out);
 	    conn.checkPermissions(handle);
-	    checkIntegrity(conn.checkConstraints(handle, constraints));
+	    InvocationConstraints higherLayerConstraints = 
+		    conn.checkConstraints(handle, constraints);
+	    checkIntegrity(higherLayerConstraints);
+	    boolean atomicity = checkAtomicity(higherLayerConstraints);
+	    if (atomicity){
+		context = context == null ? new ArrayList() : new ArrayList(context);
+		context.add( new AtomicValidationEnforcement(){
+
+		    @Override
+		    public boolean enforced() {
+			return true;
+		    }
+		});
+		context = Collections.unmodifiableCollection(context);
+	    }
 	    if (checker != null) {
 		checker.checkClientSubject(getClientSubject(conn, handle));
 	    }
@@ -128,12 +150,55 @@ public abstract class EndpointBasedServer
 		    "handshake hash mismatch");
 	    }
 
-	    Plaintext.writeUnicastResponse(out, response, context);
-	    out.flush();
+	    writeUnicastResponse(out, response, context);
 	} finally {
 	    conn.close();
 	    lc.getListenHandle().close();
 	}
+    }
+    
+    /**
+     * Allows server providers to use a different unicast response.
+     * 
+     * 
+     * @param out
+     * @param response
+     * @param context
+     * @throws IOException 
+     */
+    protected void writeUnicastResponse(OutputStream out,
+					UnicastResponse response,
+					Collection context)
+	throws IOException
+    {
+	Plaintext.writeUnicastResponse(out, response, context);
+	out.flush();
+    }
+    
+    protected void writeClassAnnotationCerts(OutputStream out,
+					UnicastResponse response) throws IOException
+    {
+	String classAnnotation = "";
+	    String certFactoryType = classAnnotation;
+	    String certPathEncoding = certFactoryType;
+	    byte [] encodedCerts = new byte[0];
+	    ServiceRegistrar reg = response.getRegistrar();
+	    if (reg instanceof ProxyAccessor){
+		Object proxy = ((ProxyAccessor) reg).getProxy();
+		if (proxy instanceof ServiceCodebaseAccessor){
+		    ServiceCodebaseAccessor sca = (ServiceCodebaseAccessor) proxy;
+		    classAnnotation = sca.getClassAnnotation();
+		    certFactoryType = sca.getCertFactoryType();
+		    certPathEncoding = sca.getCertPathEncoding();
+		    encodedCerts = sca.getEncodedCerts();
+		}
+	    }
+	    DataOutputStream dout = new DataOutputStream(out);
+	    dout.writeUTF(classAnnotation);
+	    dout.writeUTF(certFactoryType);
+	    dout.writeUTF(certPathEncoding);
+	    dout.writeShort(encodedCerts.length);
+	    dout.write(encodedCerts);
     }
 
     /**

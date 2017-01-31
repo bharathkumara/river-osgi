@@ -28,10 +28,15 @@ import java.io.ObjectStreamClass;
 import java.io.ObjectStreamException;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.security.Guard;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import net.jini.io.context.IntegrityEnforcement;
+import org.apache.river.api.io.AtomicSerial;
+import org.apache.river.api.io.AtomicSerial.GetArg;
+import org.apache.river.api.io.DeSerializationPermission;
+import org.apache.river.api.io.Valid;
 
 /*
  * Implementation note: This class uses the helper class
@@ -69,7 +74,10 @@ import net.jini.io.context.IntegrityEnforcement;
  * @author Sun Microsystems, Inc.
  * @since 2.0
  */
+@AtomicSerial
 public class MarshalledInstance implements Serializable {
+    
+    private static final Guard UNMARSHAL = new DeSerializationPermission("MARSHALL");
 
     /**
      * @serial Bytes of serialized representation.  If <code>objBytes</code> is
@@ -94,6 +102,138 @@ public class MarshalledInstance implements Serializable {
 
     static final long serialVersionUID = -5187033771082433496L;
     
+    private static boolean check(GetArg arg) throws IOException{
+	byte [] objBytes = arg.get("objBytes", null, byte[].class);
+	byte [] locBytes = arg.get("locBytes", null, byte[].class);
+	int hash = arg.get("hash", 0);
+	if ((objBytes == null) && ((hash != 13) || (locBytes != null)))
+	    throw new InvalidObjectException("Bad hash or annotation");
+	int h = 0;
+	if (objBytes == null){
+	    h = 13;
+	} else {
+	    for (int i = 0; i < objBytes.length; i++) {
+		h = 31 * h + objBytes[i];
+	    }
+	}
+	if (h != hash) throw new InvalidObjectException("Bad hash or annotation");
+	UNMARSHAL.checkGuard(null);
+	return true;
+    }
+    
+    public MarshalledInstance(GetArg arg) throws IOException{
+	this(check(arg), arg);
+    }
+    
+    private MarshalledInstance( boolean check, GetArg arg) throws IOException {
+	objBytes = Valid.copy(arg.get("objBytes", null, byte[].class));
+	locBytes = Valid.copy(arg.get("locBytes", null, byte[].class));
+	hash = arg.get("hash", 0);
+    }
+    
+    /*
+     * TODO: ServiceProvider for MarshalFactory, to allow clients to use
+     * any Serialization framework for handback objects used in Jini api's,
+     * such as events.  It isn't appropriate to use subclasses where
+     * remote service nodes use a prior version, or don't support dynamic
+     * class loading.
+     *
+     * Service proxy's wishing to utilise different Serialization Frameworks
+     * can subclass MarshalledInstance directly to provide their own implementation.
+     */
+    
+    /**
+     * Creates a new <code>MarshalledInstance</code> that contains the
+     * marshalled representation of the current state of the supplied
+     * object. The object is serialized with the semantics defined by
+     * <code>MarshalOutput</code>.
+     * 
+     * This is designed to allow MarshalledInstance to be extensible 
+     * and utilize other Serialization Frameworks.
+     * 
+     * This constructor calls a chain of internal constructors and static
+     * methods that prevent finalizer attacks.
+     *
+     * @param obj The Object to be contained in the new 
+     *          <code>MarshalledInstance</code>
+     * @param context
+     * @param marshalFactory
+     * @throws IOException if the object cannot be serialized
+     * @throws NullPointerException if context or marshalFactory is null.
+     */
+    protected MarshalledInstance(Object obj, Collection context, MarshalFactory marshalFactory) throws IOException{
+	this(obj, context, marshalFactory,
+		obj != null ? new ByteArrayOutputStream() : null,
+		obj != null ? new ByteArrayOutputStream() : null);
+    }
+    
+    private MarshalledInstance(Object obj, Collection context, MarshalFactory factory, ByteArrayOutputStream bout,
+	    ByteArrayOutputStream lout) throws IOException
+    {
+	this(bout, 
+	    obj != null ?
+		writeOutRetLocAnnotation(obj, context, factory, bout, lout) 
+		: null
+	);
+    }
+    
+    /**
+     * 
+     * @param obj Object to be marshaled.
+     * @param context
+     * @param factory MarshalFactory used to create MarshalIntstanceOutput
+     * @param bout ByteArrayOutputStream to write object serial form.
+     * @param lout ByteArrayOutputStream to write code-base annotation to.
+     * @return byte array of location.
+     * @throws IOException 
+     */
+    private static byte[] writeOutRetLocAnnotation(Object obj, Collection context, MarshalFactory factory,
+	    ByteArrayOutputStream bout, ByteArrayOutputStream lout) throws IOException
+    {
+	if (context == null) throw new NullPointerException();
+	if (factory == null) throw new NullPointerException();
+	MarshalInstanceOutput out = null;
+	try {
+	    out = factory.createMarshalOutput(bout, lout, context);
+	    out.writeObject(obj);
+	    out.flush();
+	    // locBytes is null if no annotations
+	    return out.hadAnnotations() ? lout.toByteArray() : null;
+	} finally {
+	    try {
+		if (out != null) out.close();
+	    } catch (IOException e){} // Ignore
+	}
+    }
+    
+    private MarshalledInstance(ByteArrayOutputStream bout, byte[] locBytes){
+	this(bout != null ? bout.toByteArray() : null, locBytes);
+    }
+    
+    private MarshalledInstance(byte[] objBytes, byte[] locBytes){
+	this.objBytes = objBytes;
+	this.locBytes = locBytes;
+	// Calculate hash from the marshalled representation of object
+	// so the hashcode will be comparable when sent between VMs.
+	//
+	// Note: This calculation must match the calculation in
+	//	 java.rmi.MarshalledObject since we use this hash
+	//	 in the converted MarshalledObject. The reverse is
+	//	 also true in that we use the MarshalledObject's
+	//	 hash for our hash. (see the MarshalledInstance(
+	//	 MarshalledObject) constructor)
+	//
+	if (objBytes == null){
+	    hash = 13; // null hash for java.rmi.MarshalledObject
+	} else {
+	    int h = 0;
+	    for (int i = 0; i < objBytes.length; i++) {
+		h = 31 * h + objBytes[i];
+	    }
+	    hash = h;
+	}
+    }
+    
     /**
      * Creates a new <code>MarshalledInstance</code> that contains the
      * marshalled representation of the current state of the supplied
@@ -102,6 +242,9 @@ public class MarshalledInstance implements Serializable {
      * object implements {@link ObjectStreamContext} and returns an empty
      * collection from its {@link ObjectStreamContext#getObjectStreamContext
      * getObjectStreamContext} method.
+     * <p>
+     * Subclasses may override {@link #getMarshalFactory() } to customize the
+     * semantics of serialization.
      *
      * @param obj The Object to be contained in the new 
      *          <code>MarshalledInstance</code>
@@ -126,43 +269,10 @@ public class MarshalledInstance implements Serializable {
      * @throws IOException if the object cannot be serialized
      * @throws NullPointerException if <code>context</code> is <code>null</code>
      */
-    public MarshalledInstance(Object obj, Collection context)
+    public MarshalledInstance(Object obj, final Collection context)
 	throws IOException
     {
-	if (context == null)
-	    throw new NullPointerException();
-
-	if (obj == null) {
-	    hash = 13;		// null hash for java.rmi.MarshalledObject
-            objBytes = null;
-            locBytes = null;
-	    return;
-	}
-	ByteArrayOutputStream bout = new ByteArrayOutputStream();
-	ByteArrayOutputStream lout = new ByteArrayOutputStream();
-	MarshalledInstanceOutputStream out =
-			new MarshalledInstanceOutputStream(bout, lout, context);
-	out.writeObject(obj);
-	out.flush();
-	objBytes = bout.toByteArray();
-	// locBytes is null if no annotations
-	locBytes = (out.hadAnnotations() ? lout.toByteArray() : null);
-
-	// Calculate hash from the marshalled representation of object
-	// so the hashcode will be comparable when sent between VMs.
-	//
-	// Note: This calculation must match the calculation in
-	//	 java.rmi.MarshalledObject since we use this hash
-	//	 in the converted MarshalledObject. The reverse is
-	//	 also true in that we use the MarshalledObject's
-	//	 hash for our hash. (see the MarshalledInstance(
-	//	 MarshalledObject) constructor)
-	//
-	int h = 0;
-	for (int i = 0; i < objBytes.length; i++) {
-	    h = 31 * h + objBytes[i];
-	}
-	hash = h;
+	this(obj, context, new MarshalFactoryInstance());
     }
 
     /**
@@ -201,10 +311,10 @@ public class MarshalledInstance implements Serializable {
 	    ObjectInputStream ois = new FromMOInputStream(bais);
 	    privateMO =
 		(net.jini.io.MarshalledObject)ois.readObject();
-	} catch (IOException ioe) {
+	} catch (IOException  ioe) {
 	    throw new AssertionError(ioe);
-	} catch (ClassNotFoundException cnfe) {
-	    throw new AssertionError(cnfe);
+	} catch (ClassNotFoundException ioe){
+	    throw new AssertionError(ioe);
 	}
 	objBytes = privateMO.objBytes;
 	locBytes = privateMO.locBytes;
@@ -218,12 +328,14 @@ public class MarshalledInstance implements Serializable {
      * <p>
      * The object contained in this <code>MarshalledInstance</code>
      * object will not be unmarshalled as part of this call.
+     * <p>
+     * Some Objects in the Jini api include MarshalledObject as part of their
+     * serial form.
      * @return A new <code>MarshalledObject</code> which
      *        contains an object equivalent to the object
      *        contained in this <code>MarshalledInstance</code>
      */
     public java.rmi.MarshalledObject convertToMarshalledObject() {
-
 	// To create a java.rmi.MarshalledObject with previously
 	// serialized data we first create a private
 	// net.jini.io.MarshalledObject with the
@@ -250,10 +362,19 @@ public class MarshalledInstance implements Serializable {
 	    mo = (java.rmi.MarshalledObject)ois.readObject();
 	} catch (IOException ioe) {
 	    throw new AssertionError(ioe);
-	} catch (ClassNotFoundException cnfe) {
-	    throw new AssertionError(cnfe);
+	} catch (ClassNotFoundException ioe){
+	    throw new AssertionError(ioe);
 	}
 	return mo;
+    }
+    
+    /**
+     * Sub classes implement this method to use alternative Serialization
+     * frameworks to unmarshall data.
+     * @return 
+     */
+    protected MarshalFactory getMarshalFactory(){
+	return new MarshalFactoryInstance();
     }
 
     /**
@@ -266,7 +387,7 @@ public class MarshalledInstance implements Serializable {
      * IntegrityEnforcement}; the {@link IntegrityEnforcement#integrityEnforced
      * integrityEnforced} method of this element returns the specified
      * <code>verifyCodebaseIntegrity</code> value.
-     * <p>MarshalledInstance</code> implements this method by calling
+     * <p><code>MarshalledInstance</code> implements this method by calling
      * <code>{@link #get(ClassLoader, boolean, ClassLoader, Collection)
      * get}(null, verifyCodebaseIntegrity, null, null)</code>.
      *
@@ -329,37 +450,46 @@ public class MarshalledInstance implements Serializable {
      *         is <code>true</code> and the integrity of the
      *         contained object's codebase cannot be confirmed
      */
-    public Object get(ClassLoader defaultLoader,
+    public Object get(final ClassLoader defaultLoader,
 		      final boolean verifyCodebaseIntegrity,
-		      ClassLoader verifierLoader,
-		      Collection context)
+		      final ClassLoader verifierLoader,
+		      final Collection context)
 	throws IOException, ClassNotFoundException 
     {
 	if (objBytes == null)   // must have been a null object
 	    return null;
- 
+	final Collection ctext;
 	if (context == null) {
-	    context = Collections.singleton(
-			new IntegrityEnforcement() {
-			    public boolean integrityEnforced() {
-				return verifyCodebaseIntegrity;
-			    }
-			} );
+	    ctext = Collections.singleton( new IntegrityEnforcement(){
+
+		@Override
+		public boolean integrityEnforced() {
+		    return verifyCodebaseIntegrity;
+		}
+		
+	    });
+	} else {
+	    ctext = context;
 	}
-	ByteArrayInputStream bin = new ByteArrayInputStream(objBytes);
+	final ByteArrayInputStream bin = new ByteArrayInputStream(objBytes);
 	// locBytes is null if no annotations
-	ByteArrayInputStream lin =
+	final ByteArrayInputStream lin =
 	    (locBytes == null ? null : new ByteArrayInputStream(locBytes));
-	MarshalledInstanceInputStream in =
-	    new MarshalledInstanceInputStream(bin, lin,
-					      defaultLoader,
-					      verifyCodebaseIntegrity,
-					      verifierLoader,
-					      context);
-	in.useCodebaseAnnotations();
-	Object obj = in.readObject();
-	in.close();
-	return obj;
+	Object obj;	    
+	
+	MarshalInstanceInput in = null;
+	try {
+	    in = getMarshalFactory().createMarshalInput(
+		bin, lin, defaultLoader, verifyCodebaseIntegrity,
+		verifierLoader, ctext);
+	    in.useCodebaseAnnotations();
+	    obj = in.readObject();
+	    return obj;
+	} finally {
+	    try {
+		if (in != null) in.close();
+	    } catch (IOException e){} // Ignore
+	}
     }
 
     /**
@@ -392,12 +522,25 @@ public class MarshalledInstance implements Serializable {
      * two objects can be equivalent if they have the same serialized
      * representation, except for the codebase of each class in the
      * serialized representation.
+     * <p>
+     * Subclasses should not override this method.
+     * 
+     * @since 3.1.0 MarshalledInstance is extensible and since it is used for hand-back
+     * objects over remote connections and because it's possible for
+     * MarshalledInstance to be converted to MarshalledObject and back again to 
+     * MarshalledInstance, the resulting conversion may loose type compatibility
+     * with the original instance which may be a subclass of MarshalledInstance.  
+     * This equals method allows a caller to determine if the hand-back
+     * instance is equal to the original, based solely on the serial form 
+     * of the contained object.
+     * 
      * @param obj the object to compare with this
      *            <code>MarshalledInstance</code>
      * @return <code>true</code> if the argument contains an object
      *         with an equivalent serialized form; otherwise returns
      *         <code>false</code>
      */
+    @Override
     public boolean equals(Object obj) {
 	if (obj == this)
 	    return true;
@@ -415,14 +558,25 @@ public class MarshalledInstance implements Serializable {
      * Returns the hash code for this <code>MarshalledInstance</code>.
      * The hash code is calculated only from the serialized form
      * of the contained object.
+     * <p>
+     * Subclasses should not override this method.
+     * 
      * @return The hash code for this object
      */
+    @Override
     public int hashCode() {
 	return hash;
     }
 
+    private void writeObject(ObjectOutputStream out) throws IOException {
+	out.defaultWriteObject();
+    }
+
     /**
      * Verify the case of null contained object.
+     * @param in ObjectInputStream
+     * @throws ClassNotFoundException if class not found.
+     * @throws IOException if a problem occurs during de-serialization.
      */
     private void readObject(ObjectInputStream in)
 	throws IOException, ClassNotFoundException
@@ -438,11 +592,39 @@ public class MarshalledInstance implements Serializable {
 
     /**
      * Protect against missing superclass.
+     * @throws ObjectStreamException an instance of InvalidObjectException if invoked.
      */
     private void readObjectNoData() throws ObjectStreamException {
 	throw new InvalidObjectException("Bad class hierarchy");
     }
 
+    static class MarshalFactoryInstance implements MarshalFactory {
+
+	@Override
+	public MarshalInstanceInput createMarshalInput(InputStream objIn,
+		InputStream locIn, 
+		ClassLoader defaultLoader,
+		boolean verifyCodebaseIntegrity,
+		ClassLoader verifierLoader,
+		Collection context) throws IOException 
+	{
+	    return new MarshalledInstanceInputStream(
+		    objIn,
+		    locIn,
+		    defaultLoader,
+		    verifyCodebaseIntegrity,
+		    verifierLoader,
+		    context
+	    );
+	}
+
+	@Override
+	public MarshalInstanceOutput createMarshalOutput(OutputStream objOut,
+		OutputStream locOut, Collection context) throws IOException {
+	    return new MarshalledInstanceOutputStream(objOut, locOut, context);
+	}
+    }
+    
     /**
      * This class is used to marshal objects for
      * <code>MarshalledInstance</code>.  It places the location annotations
@@ -454,10 +636,10 @@ public class MarshalledInstance implements Serializable {
      * @see MarshalledInstanceInputStream
      */  
     private static class MarshalledInstanceOutputStream
-        extends MarshalOutputStream
+        extends MarshalOutputStream implements MarshalInstanceOutput
     {
 	/** The stream on which location objects are written. */
-	private ObjectOutputStream locOut;
+	private final ObjectOutputStream locOut;
  
 	/** <code>true</code> if non-<code>null</code> annotations are
 	 *  written.
@@ -484,6 +666,7 @@ public class MarshalledInstance implements Serializable {
 	 * Returns <code>true</code> if any non-<code>null</code> location
 	 * annotations have been written to this stream.
 	 */
+	@Override
 	public boolean hadAnnotations() {
 	    return hadAnnotations;
 	}
@@ -492,11 +675,13 @@ public class MarshalledInstance implements Serializable {
 	 * Overrides <code>MarshalOutputStream.writeAnnotation</code>
 	 * implementation to write annotations to the location stream.
 	 */
-	protected void writeAnnotation(String loc) throws IOException {
+	@Override
+	public void writeAnnotation(String loc) throws IOException {
 	    hadAnnotations |= (loc != null);
 	    locOut.writeObject(loc);
 	}
 
+	@Override
 	public void flush() throws IOException {
 	    super.flush();
 	    locOut.flush();
@@ -509,13 +694,13 @@ public class MarshalledInstance implements Serializable {
      * @see MarshalledInstanceOutputStream
      */  
     private static class MarshalledInstanceInputStream
-        extends MarshalInputStream
+        extends MarshalInputStream implements MarshalInstanceInput
     {
 	/**
 	 * The stream from which annotations will be read.  If this is
 	 * <code>null</code>, then all annotations were <code>null</code>.
 	 */
-	private ObjectInputStream locIn;
+	private final ObjectInputStream locIn;
  
 	/**
 	 * Creates a new <code>MarshalledObjectInputStream</code> that
@@ -545,6 +730,7 @@ public class MarshalledInstance implements Serializable {
 	 * return locations from the stream we were given, or <code>null</code>
 	 * if we were given a <code>null</code> location stream.
 	 */
+	@Override
 	protected String readAnnotation()
 	    throws IOException, ClassNotFoundException
 	{

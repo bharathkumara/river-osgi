@@ -210,7 +210,7 @@ final class ThreadPool implements Executor, java.util.concurrent.Executor {
 
         public Thread newThread(Runnable r) {
             return AccessController.doPrivileged(
-		new NewThreadAction(threadGroup, r, NewThreadAction.NAME_PREFIX, false));
+                        new NewThreadAction(threadGroup, r, NewThreadAction.NAME_PREFIX, false, 228));
         }
         
     }

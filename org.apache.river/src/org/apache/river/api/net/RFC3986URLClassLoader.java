@@ -28,8 +28,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectStreamException;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.JarURLConnection;
 import java.net.MalformedURLException;
@@ -1478,7 +1476,8 @@ public class RFC3986URLClassLoader extends java.net.URLClassLoader {
      * 
      * TODO: Add support for nested Exceptions when support for Java 6 is dropped. 
      * 
-     * @throws IOException
+     * @throws IOException if closing any file opened by this ClassLoader 
+     * causes an IOException, only the first instance is thrown.
      */
     public void close() throws IOException {
         synchronized (searchList){

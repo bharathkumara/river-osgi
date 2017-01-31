@@ -5,5 +5,4 @@ Include-Resource: plugin.xml=_plugin.xml
 -includeresource: resources/
 -buildpath: \
 	org.eclipse.osgi;version=3.11,\
-	org.eclipse.equinox.preferences,\
 	org.eclipse.osgi.services

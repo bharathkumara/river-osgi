@@ -22,7 +22,6 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.logging.Logger;
 import java.util.logging.Level;
-import net.jini.security.Security;
 
 /**
  * A convenience class for retrieving the string value of a system
@@ -31,7 +30,7 @@ import net.jini.security.Security;
  * <p>An instance of this class can be used as the argument of {@link
  * AccessController#doPrivileged(PrivilegedAction)
  * AccessController.doPrivileged} or {@link
- * Security#doPrivileged(PrivilegedAction) Security.doPrivileged}.
+ * net.jini.security.Security#doPrivileged(PrivilegedAction) Security.doPrivileged}.
  *
  * <p>The following code retrieves the value of the system property
  * named <code>"prop"</code> as a privileged action:
@@ -50,7 +49,7 @@ import net.jini.security.Security;
  * 
  * @see		PrivilegedAction
  * @see		AccessController
- * @see		Security
+ * @see		net.jini.security.Security
  * @since 2.0
  **/
 public class GetPropertyAction implements PrivilegedAction<String> {
@@ -96,6 +95,7 @@ public class GetPropertyAction implements PrivilegedAction<String> {
      * @return	the string value of the system property or the default
      * value, or <code>null</code>
      **/
+    @Override
     public String run() {
 	try {
 	    String value = System.getProperty(theProp);

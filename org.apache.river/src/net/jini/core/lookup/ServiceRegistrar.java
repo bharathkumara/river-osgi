@@ -17,10 +17,12 @@
  */
 package net.jini.core.lookup;
 
-import java.rmi.RemoteException;
 import java.rmi.MarshalledObject;
-import net.jini.core.event.*;
+import java.rmi.RemoteException;
 import net.jini.core.discovery.LookupLocator;
+import net.jini.core.event.EventRegistration;
+import net.jini.core.event.RemoteEventListener;
+import net.jini.io.MarshalledInstance;
 
 /**
  * Defines the interface to the lookup service.  The interface is not a
@@ -81,7 +83,7 @@ public interface ServiceRegistrar {
      * @param leaseDuration requested lease duration, in milliseconds
      * @return a ServiceRegistration in this lookup service for the specified 
      *         service item
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException if a connection problem occurs.
      */
     ServiceRegistration register(ServiceItem item, long leaseDuration)
 	throws RemoteException;
@@ -96,7 +98,7 @@ public interface ServiceRegistrar {
      * @param tmpl template to match
      * @return an object that represents a service that matches the 
      *         specified template
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException if a connection problem occurs.
      */
     Object lookup(ServiceTemplate tmpl) throws RemoteException;
 
@@ -116,7 +118,7 @@ public interface ServiceRegistrar {
      *         items matching the template, plus the total number of items
      *         that match the template.  The return value is never null, and
      *         the returned items array is only null if maxMatches is zero.
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException if a connection problem occurs.
      */
     ServiceMatches lookup(ServiceTemplate tmpl, int maxMatches)
 	throws RemoteException;
@@ -161,8 +163,9 @@ public interface ServiceRegistrar {
      * @param leaseDuration requested lease duration
      * @return an EventRegistration object to the entity that registered the
      *         specified remote listener
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException if a connection problem occurs.
      */
+    @Deprecated
     EventRegistration notify(ServiceTemplate tmpl,
 			     int transitions,
 			     RemoteEventListener listener,
@@ -184,7 +187,7 @@ public interface ServiceRegistrar {
      * @param tmpl template to match
      * @return an array of entry Classes (attribute sets) for every service 
      *         that matches the specified template
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException if a connection problem occurs.
      */
     Class[] getEntryClasses(ServiceTemplate tmpl) throws RemoteException;
 
@@ -209,7 +212,7 @@ public interface ServiceRegistrar {
      *         
      * @throws NoSuchFieldException field does not name a field of the
      *         entry template
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException if a connection problem occurs.
      */
     Object[] getFieldValues(ServiceTemplate tmpl, int setIndex, String field)
 	throws NoSuchFieldException, RemoteException;
@@ -231,7 +234,7 @@ public interface ServiceRegistrar {
      *
      * @return an array of Classes of all services that either match the
      *         specified template or match the specified prefix 
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException if a connection problem occurs.
      */
     Class[] getServiceTypes(ServiceTemplate tmpl, String prefix)
 	throws RemoteException;
@@ -253,7 +256,7 @@ public interface ServiceRegistrar {
      *
      * @return a LookupLocator that can be used for unicast discovery of
      *         the lookup service, if necessary.
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException when a connection problem occurs.
      */
     LookupLocator getLocator() throws RemoteException;
 
@@ -263,7 +266,7 @@ public interface ServiceRegistrar {
      *
      * @return a String array of groups that this lookup service is currently
      *         a member of.
-     * @throws java.rmi.RemoteException
+     * @throws java.rmi.RemoteException when a connection problem occurs.
      */
     String[] getGroups() throws RemoteException;
 }

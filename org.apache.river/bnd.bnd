@@ -2,7 +2,7 @@ Fragment-Host: system.bundle
 -includeresource: lib,\
     resource
 Bundle-ClassPath: .,high-scale-lib.jar
-
+ExtensionBundle-Activator:org.apache.river.Activator
 Import-Package: !*
 Export-Package: \
 	net.jini.activation,\
@@ -83,6 +83,27 @@ Export-Package: \
 	org.apache.river.thread,\
 	org.apache.river.start,\
 	org.apache.river.start.ext,\
-	org.apache.river.tool
-Bundle-Version: 3.0.0
+	org.apache.river.tool,\
+	com.sun.jini.admin,\
+	com.sun.jini.config,\
+	com.sun.jini.constants,\
+	com.sun.jini.landlord,\
+	com.sun.jini.logging,\
+	com.sun.jini.lookup.entry,\
+	com.sun.jini.proxy,\
+	com.sun.jini.reliableLog,\
+	org.apache.river.discovery.https,\
+	org.apache.river.discovery.ssl.sha224,\
+	org.apache.river.discovery.ssl.sha256,\
+	org.apache.river.discovery.ssl.sha384,\
+	org.apache.river.discovery.ssl.sha512,\
+	org.apache.river.discovery.x500.sha1withdsa,\
+	org.apache.river.discovery.x500.sha1withrsa,\
+	org.apache.river.discovery.x500.sha256withdsa,\
+	org.apache.river.discovery.x500.sha512withecdsa,\
+	org.apache.river.discovery.x500.sha512withrsa,\
+	org.apache.river,\
+	org.apache.river.api.io,\
+	com.sun.jini.start
+Bundle-Version: 4.0.0
 -buildpath: org.eclipse.osgi

@@ -431,25 +431,6 @@ import org.apache.river.api.net.Uri;
         return urls.toArray(new URL[urls.size()]);
     }
 
-    /** 
-     * Converts common-purpose collection of Permissions to PermissionCollection.
-     *
-     * @param perms a collection containing arbitrary permissions, may be null
-     * @return mutable heterogeneous PermissionCollection containing all Permissions 
-     * from the specified collection
-     */
-    static PermissionCollection 
-            toPermissionCollection(Collection<Permission> perms) {
-        PermissionCollection pc = new Permissions();
-        if (perms != null) {
-            for (Iterator<Permission> iter = perms.iterator(); iter.hasNext();) {
-                Permission element = iter.next();
-                pc.add(element);
-            }
-        }
-        return pc;
-    }
-
     // Empty set of arguments to default constructor of a Permission.
     private static final Class[] NO_ARGS = {};
 
@@ -468,7 +449,7 @@ import org.apache.river.api.net.Uri;
      * @param targetActions actions of expected Permission instance
      * @return a new Permission instance
      * @throws IllegalArgumentException if no suitable constructor found
-     * @throws Exception any exception thrown by Constructor.newInstance()
+     * @throws InstantiationException any exception thrown by Constructor.newInstance()
      */
     static Permission instantiatePermission(Class<?> targetType,
             String targetName, String targetActions)

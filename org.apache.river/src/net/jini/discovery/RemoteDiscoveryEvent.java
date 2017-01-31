@@ -17,21 +17,24 @@
  */
 package net.jini.discovery;
 
-import java.io.InvalidObjectException;
 import java.io.IOException;
+import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.rmi.MarshalledObject;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
 import net.jini.core.event.RemoteEvent;
+import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.io.MarshalledInstance;
-
+import org.apache.river.api.io.AtomicMarshalledInstance;
+import org.apache.river.api.io.AtomicSerial;
+import org.apache.river.api.io.AtomicSerial.GetArg;
 import org.apache.river.proxy.MarshalledWrapper;
-import java.util.List;
-import net.jini.core.lookup.ServiceID;
 
 /**
  * Whenever the lookup discovery service discovers or discards a lookup
@@ -98,6 +101,7 @@ import net.jini.core.lookup.ServiceID;
  * @see net.jini.core.event.RemoteEvent
  * @see net.jini.core.lookup.ServiceRegistrar
  */
+@AtomicSerial
 public class RemoteDiscoveryEvent extends RemoteEvent {
 
     private static final long serialVersionUID = -9171289945014585248L;
@@ -110,7 +114,7 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
      *
      * @serial
      */
-    protected boolean discarded;
+    protected final boolean discarded;
 
     /**
      * List consisting of marshalled proxy objects where each proxy implements
@@ -138,22 +142,22 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
      *
      * @serial
      */
-    protected List<MarshalledObject> marshalledRegs;
+    private final List<MarshalledObject> marshalledRegs;
 
     /**
      * Array containing a subset of the set of proxies to the lookup
      * service(s) with which this event is associated. The elements of this
-     * array correspond to those elements of the <code>marshalledRegs<code>
+     * array correspond to those elements of the <code>marshalledRegs</code>
      * array that were successfully unmarshalled (at least once) as a result
      * of one or more invocations of the <code>getRegistrars</code> method
      * of this event. Upon deserializing this event, this array is empty,
-     * but of the same size as <code>marshalledRegs<code>; and will be
+     * but of the same size as <code>marshalledRegs</code>; and will be
      * populated when the recipient of this event retrieves the registrars
-     * corresponding to the elements of <code>marshalledRegs<code>.
+     * corresponding to the elements of <code>marshalledRegs</code>.
      *
      * @serial
      */
-    protected ServiceRegistrar[] regs;
+    private final ServiceRegistrar[] regs;
 
     /**
      * <code>Map</code> from the service IDs of the registrars of this event
@@ -161,7 +165,55 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
      *
      * @serial
      */
-    protected Map<ServiceID,String> groups;
+    private final Map<ServiceID,String[]> groups;
+
+    private static GetArg check(GetArg arg) throws IOException {
+	RemoteEvent sup = new RemoteEvent(arg);
+	if(sup.getSource() == null)
+            throw new InvalidObjectException("RemoteDiscoveryEvent.readObject "
+                                            +"failure - source field is null");
+	try {
+	    List<MarshalledObject> marshalledRegs 
+		    = (List<MarshalledObject>) arg.get("marshalledRegs", null);
+
+	    List<MarshalledObject> checked = Collections.checkedList(
+		new ArrayList<MarshalledObject>(marshalledRegs.size()),
+		MarshalledObject.class
+	    );
+	    checked.addAll(marshalledRegs);
+
+	    // Also handles null case.
+	    if (!(arg.get("regs", null) instanceof ServiceRegistrar [])) 
+		throw new ClassCastException();
+
+	    Map<ServiceID, String[]> groups 
+		    = (Map<ServiceID, String[]>) arg.get("groups", null);
+	    // IdentityHashMap used to avoid DOS attack with identical objects.
+	    Map<ServiceID, String[]> checkedGroups = Collections.checkedMap(
+		new HashMap<ServiceID, String[]>(groups.size()),
+		ServiceID.class,
+		String[].class
+	    );
+	    checkedGroups.putAll(groups);
+	} catch (ClassCastException ex){
+	    InvalidObjectException e = new InvalidObjectException("invariant check failed");
+	    e.initCause(ex);
+	    throw e;
+	}
+	return arg;
+    }
+    
+    public RemoteDiscoveryEvent(GetArg arg) throws IOException {
+	super(check(arg));
+	discarded = arg.get("discarded", false);
+	marshalledRegs = new ArrayList<MarshalledObject>(
+		(List<MarshalledObject>) arg.get("marshalledRegs", null));
+	regs = ((ServiceRegistrar[]) arg.get("regs", null)).clone();
+	groups = new HashMap<ServiceID, String[]>(
+		(Map<ServiceID, String[]>) arg.get("groups", null));
+	integrity = MarshalledWrapper.integrityEnforced(arg);
+	atomic = MarshalledWrapper.atomicityEnforced(arg);
+    }
 
     /**
      * Flag related to the verification of codebase integrity. A value of
@@ -170,7 +222,90 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
      * in effect.
      */
     private transient boolean integrity;
+    
+    private transient boolean atomic;
 
+    /**
+     * Constructs a new instance of <code>RemoteDiscoveryEvent</code>.
+     *
+     * @param source     reference to the lookup discovery service that
+     *                   generated the event
+     * @param eventID    the event identifier that maps a particular
+     *                   registration to its listener and targeted groups
+     *                   and locators
+     * @param seqNum     the sequence number of this event
+     * @param handback   the client handback (null may be input)
+     * @param discarded  flag indicating whether the event being constructed
+     *                   is a discovery event or a discard event
+     * @param groups     mapping from the registrars of this event to the
+     *                   groups in which each registrar is a member
+     *
+     * @throws java.io.IOException when serialization failure occurs on 
+     *         every registrar of this event. That is, if at least one
+     *         registrar is successfully serialized, then this exception
+     *         will not be thrown.
+     *
+     * @throws java.lang.NullPointerException this exception occurs when
+     *         either <code>null</code> is input for the map parameter, or
+     *         at least one element of that map is <code>null</code>.
+     *
+     * @throws java.lang.IllegalArgumentException this exception occurs
+     *         when an empty set of registrars is input.
+     */
+    @Deprecated
+    public RemoteDiscoveryEvent(Object source,
+                                long eventID,
+                                long seqNum,
+                                MarshalledObject handback,
+                                boolean discarded,
+                                Map<ServiceRegistrar,String[]> groups)    throws IOException
+    {
+	super(source, eventID, seqNum, handback);
+	this.discarded = discarded;
+        if(groups != null) {
+            /* If the set of registrars is empty, throw exception */
+            if(groups.size() == 0) {
+                throw new IllegalArgumentException("empty input map");
+            }
+            ServiceRegistrar[] registrars =
+                          (ServiceRegistrar[])(groups.keySet()).toArray
+                                        (new ServiceRegistrar[groups.size()]);
+            /* If any elements of the array are null, throw exception */
+            for(int i=0;i<registrars.length;i++) {
+                if(registrars[i] == null) {
+                    throw new NullPointerException("null element ("+i
+                                                   +") in input map");
+                }
+            }
+            /* Create a new marshalled instance of each element of the
+             * registrars array, and place each in the marshalledRegs
+             * ArrayList of this class. Also, construct the groups map that
+             * contains the mappings from the service ID of each registrar
+             * to the registrar's corresponding member groups.
+             *
+             * Drop any element that can't be serialized.
+             */
+            this.groups = new HashMap<ServiceID,String[]>(groups.size());
+            this.marshalledRegs = new ArrayList(groups.size());
+            int l = registrars.length;
+            for(int i=0;i<l;i++) {
+                try {
+                    marshalledRegs.add(new MarshalledInstance(registrars[i]).convertToMarshalledObject());
+                    (this.groups).put((registrars[i]).getServiceID(),
+                                       groups.get(registrars[i]) );
+		} catch(IOException e) { /* drop if can't serialize */ }
+            }
+            if( !(marshalledRegs.isEmpty()) ) {
+                regs = new ServiceRegistrar[marshalledRegs.size()];
+            } else {
+                throw new IOException("failed to serialize any of the "
+                                      +registrars.length+" elements");
+            }
+	} else {
+            throw new NullPointerException("null input map");
+        }
+    }//end constructor
+    
     /**
      * Constructs a new instance of <code>RemoteDiscoveryEvent</code>.
      *
@@ -201,9 +336,9 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
     public RemoteDiscoveryEvent(Object source,
                                 long eventID,
                                 long seqNum,
-                                MarshalledObject handback,
+                                MarshalledInstance handback,
                                 boolean discarded,
-                                Map<ServiceRegistrar,String> groups)    throws IOException
+                                Map<ServiceRegistrar,String[]> groups)    throws IOException
     {
 	super(source, eventID, seqNum, handback);
 	this.discarded = discarded;
@@ -230,12 +365,12 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
              *
              * Drop any element that can't be serialized.
              */
-            this.groups = new HashMap<ServiceID,String>(groups.size());
+            this.groups = new HashMap<ServiceID,String[]>(groups.size());
             this.marshalledRegs = new ArrayList(groups.size());
             int l = registrars.length;
             for(int i=0;i<l;i++) {
                 try {
-                    marshalledRegs.add(new MarshalledInstance(registrars[i]).convertToMarshalledObject());
+                    marshalledRegs.add(new AtomicMarshalledInstance(registrars[i]).convertToMarshalledObject());
                     (this.groups).put((registrars[i]).getServiceID(),
                                        groups.get(registrars[i]) );
 		} catch(IOException e) { /* drop if can't serialize */ }
@@ -326,7 +461,7 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
     public ServiceRegistrar[] getRegistrars() throws LookupUnmarshalException {
 	synchronized (marshalledRegs) {
             if( marshalledRegs.size() > 0 ) {
-                List unmarshalledRegs = new ArrayList();
+                List<ServiceRegistrar> unmarshalledRegs = new ArrayList<ServiceRegistrar>();
                 List exceptions = unmarshalRegistrars(marshalledRegs,
                                                            unmarshalledRegs);
                 /* Add the un-marshalled elements to the end of regs */
@@ -365,8 +500,8 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
      *          the names of the groups in which the lookup service having
      *          the corresponding service ID is a member.
      */
-    public Map<ServiceID,String> getGroups() {
-        return new HashMap<ServiceID,String>(groups);
+    public Map<ServiceID,String[]> getGroups() {
+        return new HashMap<ServiceID,String[]>(groups);
     }//end getGroups
 
     /**
@@ -398,10 +533,10 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
      *         result of attempts to unmarshal each element of the first
      *         argument to this method.
      */
-    private List unmarshalRegistrars(List marshalledRegs,
-                                          List unmarshalledRegs)
+    private List<Throwable> unmarshalRegistrars(List<MarshalledObject> marshalledRegs,
+                                          List<ServiceRegistrar> unmarshalledRegs)
     {
-        ArrayList exceptions = new ArrayList();
+        ArrayList<Throwable> exceptions = new ArrayList<Throwable>();
        /* Try to un-marshal each element in marshalledRegs; verify codebase
         * when appropriate.
         * 
@@ -425,17 +560,14 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
         int i = 0;
         int nMarshalledRegs = marshalledRegs.size();
         for(int n=0;n<nMarshalledRegs;n++) {
-            MarshalledObject marshalledObj
-                                  = (MarshalledObject)(marshalledRegs.get(i));
-            MarshalledInstance marshalledInstance
-                                  =  new MarshalledInstance(marshalledObj);
+            MarshalledInstance marshalledInstance = atomic ?
+		        new AtomicMarshalledInstance(marshalledRegs.get(i)):
+			new MarshalledInstance(marshalledRegs.get(i));
             try {
-                ServiceRegistrar reg =
-                         (ServiceRegistrar)(marshalledInstance.get(integrity));
                 /* Success: record the un-marshalled element
                  *          delete the corresponding un-marshalled element
                  */
-                unmarshalledRegs.add( reg );
+                unmarshalledRegs.add( (ServiceRegistrar) marshalledInstance.get(integrity));
                 marshalledRegs.remove(i);
             } catch(Throwable e) {
                 exceptions.add(e);
@@ -523,6 +655,10 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
         return i;
     }//end indexFirstNull
 
+    private void writeObject(ObjectOutputStream out) throws IOException {
+	out.defaultWriteObject();
+    }
+
     /** 
      * When an instance of this class is deserialized, this method is
      * automatically invoked. This implementation of this method validates
@@ -530,7 +666,7 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
      * whether or not codebase integrity verification was performed when
      * unmarshalling occurred.
      *
-     * @throws <code>InvalidObjectException</code> if the state of the
+     * @throws InvalidObjectException if the state of the
      *         deserialized instance of this class is found to be invalid.
      */
     private void readObject(ObjectInputStream s)  
@@ -544,6 +680,7 @@ public class RemoteDiscoveryEvent extends RemoteEvent {
         }//endif
         /* Retrieve the value of the integrity flag */
         integrity = MarshalledWrapper.integrityEnforced(s);
+	atomic = false; // Atomic streams don't call readObject.
     }//end readObject
 
 }//end class RemoteDiscoveryEvent

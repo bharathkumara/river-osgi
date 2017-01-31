@@ -81,7 +81,27 @@ import org.cliffc.high_scale_lib.NonBlockingHashMap;
  */
 public class CombinerSecurityManager 
 extends SecurityManager implements CachingSecurityManager {
-    private static final Logger logger = Logger.getLogger(CombinerSecurityManager.class.getName());
+    private static Logger logger;
+    private static final Object loggerLock = new Object();
+
+    /**
+     * Logger is lazily loaded, the SecurityManager can be loaded prior to
+     * the system ClassLoader, attempting to load a Logger will cause a 
+     * NullPointerException, when calling ClassLoader.getSystemClassLoader(),
+     * in order to load the logger class.
+     * 
+     * Note, that since we call Security.getContext(), it too must lazily load
+     * its loggers.
+     * 
+     * @return the logger
+     */
+    private static Logger getLogger() {
+        synchronized (loggerLock){
+            if (logger != null) return logger;
+            logger = Logger.getLogger(CombinerSecurityManager.class.getName());
+            return logger;
+        }
+    }
     private final DomainCombiner dc;
     // Cache of optimised Delegate AccessControlContext's
     private final ConcurrentMap<AccessControlContext, AccessControlContext> contextCache;
@@ -92,6 +112,7 @@ extends SecurityManager implements CachingSecurityManager {
     private final Comparator<Referrer<Permission>> permCompare;
     private final AccessControlContext SMConstructorContext;
     private final AccessControlContext SMPrivilegedContext;
+    private final SecurityContext SMSecurityContext;
     private final ProtectionDomain privilegedDomain;
     private final ThreadLocal<SecurityContext> threadContext;
     private final ThreadLocal<Boolean> inTrustedCodeRecursiveCall;
@@ -116,6 +137,7 @@ extends SecurityManager implements CachingSecurityManager {
         // Get context before this becomes a SecurityManager.
         // super() checked the permission to create a SecurityManager.
         SMConstructorContext = AccessController.getContext();
+        SMSecurityContext = Security.getContext(); // Force class loading of Security.
         ProtectionDomain [] context = new ProtectionDomain[1];
         privilegedDomain = this.getClass().getProtectionDomain();
         context[0] = privilegedDomain;
@@ -170,7 +192,7 @@ extends SecurityManager implements CachingSecurityManager {
          */
 	/* The following ensures the classes we need are loaded early to avoid
 	 * class loading deadlock */
-	checkPermission(createAccPerm, SMPrivilegedContext);
+	checkPermission(new RuntimePermission("setIO"), SMPrivilegedContext);
 	constructed = true;
     }
     
@@ -215,12 +237,12 @@ extends SecurityManager implements CachingSecurityManager {
      * It is absolutely essential that the SecurityContext override equals 
      * and hashCode.
      * 
-     * @param perm
+     * @param perm permission to be checked
      * @param context - AccessControlContext or SecurityContext
-     * @throws SecurityException 
+     * @throws SecurityException if context doesn't have permission.
      */
     @Override
-    public void checkPermission(Permission perm, Object context) throws SecurityException {
+    public final void checkPermission(Permission perm, Object context) throws SecurityException {
         if (perm == null ) throw new NullPointerException("Permission Collection null");
 	perm.getActions(); // Ensure any lazy state has been instantiated before publication.
         AccessControlContext executionContext = null;
@@ -235,8 +257,10 @@ extends SecurityManager implements CachingSecurityManager {
         }
         threadContext.set(securityContext); // may be null.
         /* The next line speeds up permission checks related to this SecurityManager. */
-        if ( constructed && SMPrivilegedContext.equals(executionContext) || 
-                SMConstructorContext.equals(executionContext)) return; // prevents endless loop in debug.
+        if ( constructed && (SMPrivilegedContext.equals(executionContext) || 
+                SMConstructorContext.equals(executionContext) ||
+                SMSecurityContext.equals(securityContext) )
+            ) return; // prevents endless loop in debug.
         // Checks if Permission has already been checked for this context.
         NavigableSet<Permission> checkedPerms = checked.get(context);
         if (checkedPerms == null){
@@ -317,8 +341,9 @@ extends SecurityManager implements CachingSecurityManager {
      * To clear the cache of checked Permissions requires the following Permission:
      * java.security.SecurityPermission("getPolicy");
      * 
-     * @throws SecurityException 
+     * @throws SecurityException if caller isn't permitted to clear cache.
      */
+    @Override
     public void clearCache() throws SecurityException {
         /* Clear the cache, out of date permission check tasks are still
          * writing to old Set's, while new checks will write to new Sets.
@@ -488,14 +513,14 @@ extends SecurityManager implements CachingSecurityManager {
                     return true;
                 } catch (ExecutionException ex) {
                     // This should never happen, unless a runtime exception occurs.
-                    if (logger.isLoggable(Level.SEVERE)) logger.log(Level.SEVERE, null, ex);
+                    if (getLogger().isLoggable(Level.SEVERE)) getLogger().log(Level.SEVERE, null, ex);
                     throw new RuntimeException("Unrecoverable: ", ex.getCause()); // Bail out.
                 }
             } catch (InterruptedException ex) {
                 // REMIND: Java Memory Model and thread interruption.           
                 // We've been externally interrupted, during execution.
                 // Do this the slow way to avoid reinterruption during shutdown cleanup!
-                if (logger.isLoggable(Level.FINEST)) logger.log(Level.FINEST, "External Interruption", ex);
+                if (getLogger().isLoggable(Level.FINEST)) getLogger().log(Level.FINEST, "External Interruption", ex);
                 for ( int i = 0; i < l; i++ ){
                     if (!checkPermission(context[i], perm)) {
                         currentThread.interrupt(); // restore external interrupt.
@@ -575,8 +600,8 @@ extends SecurityManager implements CachingSecurityManager {
     
     /**
      * Enables customisation of permission check.
-     * @param pd
-     * @param p
+     * @param pd protection domain to be checked.
+     * @param p permission to be checked.
      * @return true if ProtectionDomain pd has Permission p.
      */
     protected boolean checkPermission(ProtectionDomain pd, Permission p){
