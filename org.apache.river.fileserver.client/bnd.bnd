@@ -1,0 +1,3 @@
+-buildpath: org.eclipse.osgi.services
+Bundle-Activator: org.apache.river.fileserver.client.Activator
+Private-Package: org.apache.river.fileserver.client

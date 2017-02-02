@@ -86,19 +86,19 @@ public class LookupServiceImpl implements LookupService {
 			URL url = context.getBundle().getEntry(config);
 			String configLocation = url.toExternalForm();
 			URL classpath = context.getBundle().getEntry(importCodebase);
-			URL url2 = classpath.toURI().toURL();
-			
 
+			String policyFile = System.getProperty("user.home") + "/.java.policy";
 			ClassLoader oldCCL = Thread.currentThread().getContextClassLoader();
 			try {
 				Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
-				NonActivatableServiceDescriptor desc = new NonActivatableServiceDescriptor(codebase, "file:/C:/Users/H182933/.java.policy", classpath.toString(),
-						"org.apache.river.reggie.TransientRegistrarImpl", new String[] { configLocation });
-				
+				NonActivatableServiceDescriptor desc = new NonActivatableServiceDescriptor(codebase, policyFile,
+						classpath.toString(), "org.apache.river.reggie.TransientRegistrarImpl",
+						new String[] { configLocation });
 
 				DynamicConfiguration con = new DynamicConfiguration();
 				con.setEntry("org.apache.river.reggie", "serverExporter", Exporter.class, new JrmpExporter());
-				con.setEntry("org.apache.river.reggie", "initialMemberGroups", String[].class, new String[] { "nonsecure.hello.example.jini.sun.com" });
+				con.setEntry("org.apache.river.reggie", "initialMemberGroups", String[].class,
+						new String[] { "nonsecure.hello.example.jini.sun.com" });
 				Created created = (Created) desc.create(con);
 				lookupService = (DestroyAdmin) created.impl;
 				System.out.println("Lookup service is started");
@@ -106,7 +106,7 @@ public class LookupServiceImpl implements LookupService {
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			} finally{
+			} finally {
 				Thread.currentThread().setContextClassLoader(oldCCL);
 			}
 
@@ -139,7 +139,7 @@ public class LookupServiceImpl implements LookupService {
 	public void deactivate() {
 		stop();
 		this.context = null;
-		
+
 	}
 
 }

@@ -1,0 +1,25 @@
+-runfw: org.eclipse.osgi;version='[3.11.0.v20160603-1336,3.11.0.v20160603-1336]'
+-runee: JavaSE-1.8
+-runsystemcapabilities: ${native_capability}
+-runproperties.eqnx: \
+    osgi.console= ,\
+    osgi.console.enable.builtin=false
+-runproperties: \
+    org.osgi.framework.bootdelegation=*,\
+    org.osgi.framework.bundle.parent=framework,\
+    osgi.framework.useSystemProperties=true
+-runrequires: \
+	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.command)',\
+	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.runtime)',\
+	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
+	osgi.identity;filter:='(osgi.identity=org.eclipse.equinox.console)',\
+	osgi.identity;filter:='(osgi.identity=org.apache.river.example.fileserver)',\
+	osgi.identity;filter:='(osgi.identity=org.apache.river.fileserver.client)'
+-runbundles: \
+	org.apache.felix.gogo.command;version='[0.16.0,0.16.1)',\
+	org.apache.felix.gogo.runtime;version='[0.16.2,0.16.3)',\
+	org.apache.felix.gogo.shell;version='[0.12.0,0.12.1)',\
+	org.apache.river;version=snapshot,\
+	org.apache.river.example.fileserver;version=snapshot,\
+	org.apache.river.fileserver.client;version=snapshot,\
+	org.eclipse.equinox.console;version='[1.1.200,1.1.201)'

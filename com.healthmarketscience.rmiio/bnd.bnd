@@ -1,0 +1,6 @@
+-buildpath: jcl.over.slf4j
+Export-Package: \
+	com.healthmarketscience.rmiio,\
+	com.healthmarketscience.rmiio.exporter,\
+	com.healthmarketscience.rmiio.socket,\
+	com.healthmarketscience.rmiio.util

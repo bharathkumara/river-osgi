@@ -1,0 +1,11 @@
+Import-Package: \
+	org.apache.river.example.fileserver.proxy,\
+	net.jini.jeri.tcp,\
+	net.jini.jeri,\
+	net.jini.export,\
+	com.healthmarketscience.rmiio,\
+	org.apache.river.example.fileserver,\
+	*
+Export-Package: org.apache.river.example.fileserver.bootstrap
+Bundle-Activator: org.apache.river.example.fileserver.bootstrap.Activator
+-includeresource: resources/

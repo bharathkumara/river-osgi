@@ -14,6 +14,7 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.ServiceRegistration;
+import org.osgi.framework.wiring.BundleWiring;
 import org.osgi.util.tracker.ServiceTracker;
 import org.slf4j.Logger;
 
@@ -54,6 +55,10 @@ public class RiverServiceAdvertiser extends ServiceTracker<ServiceItem, ServiceR
 		attrSets = RiverUtils.merge(calculatedEntries, attrSets);
 		logger.info("Advertising the river service {} ", serviceItem);
 		JoinManager joinManager = null;
+		Bundle bundle = reference.getBundle();
+		ClassLoader classLoader = bundle.adapt(BundleWiring.class).getClassLoader();
+		ClassLoader oldCCL = Thread.currentThread().getContextClassLoader();
+		Thread.currentThread().setContextClassLoader(classLoader);
 		try {
 			if (serviceID == null) {
 				ServiceIDListener listener = (ServiceIDListener) reference
@@ -64,7 +69,6 @@ public class RiverServiceAdvertiser extends ServiceTracker<ServiceItem, ServiceR
 			}
 			logger.info("Completed the Advertising the River service {} in the network.", serviceItem);
 
-			Bundle bundle = reference.getBundle();
 			long id = bundle.getBundleId();
 			String bsn = bundle.getSymbolicName();
 			String serviceName = service.getClass().getName();
@@ -76,6 +80,8 @@ public class RiverServiceAdvertiser extends ServiceTracker<ServiceItem, ServiceR
 		} catch (IOException e) {
 			logger.error("Failed to Advertise the River service in the network.", e);
 			return null;
+		} finally{
+			Thread.currentThread().setContextClassLoader(oldCCL);
 		}
 
 	}
