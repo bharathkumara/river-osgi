@@ -7,12 +7,12 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 
-@Component(immediate = true, property = { "osgi.command.function=list", "osgi.command.scope=fileserver" })
+@Component(immediate = true, property = { "osgi.command.function=list", "osgi.command.scope=fileserver" },service={Object.class})
 public class FileClient {
 
 	private FileServer server;
 
-	public FileServer getServer() {
+	/*public FileServer getServer() {
 		return server;
 	}
 
@@ -23,7 +23,7 @@ public class FileClient {
 
 	public void unsetServer(FileServer server) {
 		this.server = null;
-	}
+	}*/
 
 	public void list(String... args) {
 		try {

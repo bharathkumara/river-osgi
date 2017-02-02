@@ -14,7 +14,10 @@
 	osgi.identity;filter:='(osgi.identity=org.apache.felix.gogo.shell)',\
 	osgi.identity;filter:='(osgi.identity=org.eclipse.equinox.console)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.river.example.fileserver)',\
-	osgi.identity;filter:='(osgi.identity=org.apache.river.fileserver.client)'
+	osgi.identity;filter:='(osgi.identity=org.apache.river.fileserver.client)',\
+	osgi.identity;filter:='(osgi.identity=org.apache.river.bootstrap)',\
+	osgi.identity;filter:='(osgi.identity=org.apache.river)',\
+	osgi.identity;filter:='(osgi.identity=org.eclipse.equinox.ds)'
 -runbundles: \
 	org.apache.felix.gogo.command;version='[0.16.0,0.16.1)',\
 	org.apache.felix.gogo.runtime;version='[0.16.2,0.16.3)',\
@@ -22,4 +25,10 @@
 	org.apache.river;version=snapshot,\
 	org.apache.river.example.fileserver;version=snapshot,\
 	org.apache.river.fileserver.client;version=snapshot,\
-	org.eclipse.equinox.console;version='[1.1.200,1.1.201)'
+	org.eclipse.equinox.console;version='[1.1.200,1.1.201)',\
+	ch.qos.logback.classic;version='[1.1.7,1.1.8)',\
+	ch.qos.logback.core;version='[1.1.7,1.1.8)',\
+	org.apache.river.bootstrap;version=snapshot,\
+	org.eclipse.equinox.common;version='[3.8.0,3.8.1)',\
+	org.eclipse.equinox.preferences;version='[3.6.0,3.6.1)',\
+	slf4j.api;version='[1.7.21,1.7.22)'

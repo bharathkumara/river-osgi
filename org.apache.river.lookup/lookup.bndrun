@@ -15,7 +15,7 @@
 	osgi.identity;filter:='(osgi.identity=org.eclipse.equinox.console)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.river)',\
 	osgi.identity;filter:='(osgi.identity=org.apache.river.lookup)',\
-	osgi.identity;filter:='(&(osgi.identity=org.eclipse.equinox.ds)(version>=1.4.400))'
+	osgi.identity;filter:='(osgi.identity=org.eclipse.equinox.ds)'
 -runbundles: \
 	org.apache.felix.gogo.command;version='[0.16.0,0.16.1)',\
 	org.apache.felix.gogo.shell;version='[0.12.0,0.12.1)',\
@@ -24,14 +24,14 @@
 	org.apache.river.lookup;version=snapshot,\
 	org.eclipse.equinox.common;version='[3.8.0,3.8.1)',\
 	org.eclipse.equinox.console;version='[1.1.200,1.1.201)',\
-	org.eclipse.equinox.ds;version='[1.4.400,1.4.401)',\
 	org.eclipse.equinox.preferences;version='[3.6.0,3.6.1)',\
-	org.eclipse.equinox.util;version='[1.0.500,1.0.501)',\
-	org.eclipse.osgi.services;version='[3.5.100,3.5.101)',\
 	ch.qos.logback.classic;version='[1.1.7,1.1.8)',\
 	ch.qos.logback.core;version='[1.1.7,1.1.8)',\
 	slf4j.api;version='[1.7.21,1.7.22)',\
-	org.apache.felix.gogo.runtime;version='[0.16.2,0.16.3)'
+	org.apache.felix.gogo.runtime;version='[0.16.2,0.16.3)',\
+	org.eclipse.equinox.ds;version='[1.4.400,1.4.401)',\
+	org.eclipse.equinox.util;version='[1.0.500,1.0.501)',\
+	org.eclipse.osgi.services;version='[3.5.100,3.5.101)'
 -runrepos: \
 	Workspace,\
 	Release,\
