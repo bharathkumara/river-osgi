@@ -276,14 +276,15 @@ final class Item implements Serializable, Cloneable {
 		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		    ObjectOutput out = new ObjectOutputStream(baos);
 		    out.writeObject(proxy);
-		    ByteArrayInputStream bain = new ByteArrayInputStream(baos.toByteArray());
+		    // smart proxy objects will not be visible from here
+		    /*ByteArrayInputStream bain = new ByteArrayInputStream(baos.toByteArray());
 		    ObjectInput in = new ObjectInputStream(bain);
-		    proxy = in.readObject();
+		    proxy = in.readObject();*/
 		} catch (IOException ex) {
 		    Logger.getLogger(Item.class.getName()).log(Level.SEVERE, null, ex);
-		} catch (ClassNotFoundException ex) {
+		} /*catch (ClassNotFoundException ex) {
 		    Logger.getLogger(Item.class.getName()).log(Level.SEVERE, null, ex);
-		}
+		}*/
 	    }
 	}
 	Class proxyClass = proxy.getClass();

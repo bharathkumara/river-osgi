@@ -29,7 +29,7 @@ public class LookupServiceImpl implements LookupService {
 
 	private RiverCodeServer codeServer;
 	private static final Logger logger = Logger.getLogger(ServiceStarter.class.getName());
-	private String dlFile = "reggie/reggie-dl.jar";
+	private String dlFile = "reggie/org.apache.river.lookup.proxy.jar";
 	private DestroyAdmin lookupService;
 	private BundleContext context;
 	private boolean serviceStarted = false;
@@ -81,7 +81,7 @@ public class LookupServiceImpl implements LookupService {
 			URL entry = context.getBundle().getEntry(dlFile);
 			InputStream stream = entry.openStream();
 			String importCodebase = "reggie/reggie.jar";
-			String codebase = codeServer.addJars("reggie", stream, "reggie-dl.jar");
+			String codebase = codeServer.addJars("reggie", stream, "org.apache.river.lookup.proxy.jar");
 			String config = "reggie/jrmp-reggie.config";
 			URL url = context.getBundle().getEntry(config);
 			String configLocation = url.toExternalForm();
