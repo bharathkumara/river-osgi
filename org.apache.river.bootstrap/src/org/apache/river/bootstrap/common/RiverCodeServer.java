@@ -5,12 +5,12 @@ import java.io.InputStream;
 
 public interface RiverCodeServer extends RiverService{
 
-	String addJars(String id, InputStream stream, String targetFileName) throws IOException;
+	public String addJars(String id, InputStream stream, String targetFileName) throws IOException;
 
-	int getPort();
+	public int getPort();
 
-	String getDirectory();
+	public String getDirectory();
 
-	String getBaseLocation();
+	public String getBaseLocation();
 
 }

@@ -2,7 +2,7 @@ Fragment-Host: system.bundle
 -includeresource: lib,\
     resource
 Bundle-ClassPath: .,high-scale-lib.jar
-ExtensionBundle-Activator:org.apache.river.Activator
+ExtensionBundle-Activator:org.apache.river.osgi.RiverBundleActivator
 Import-Package: !*
 Export-Package: \
 	net.jini.activation,\
@@ -102,7 +102,7 @@ Export-Package: \
 	org.apache.river.discovery.x500.sha256withdsa,\
 	org.apache.river.discovery.x500.sha512withecdsa,\
 	org.apache.river.discovery.x500.sha512withrsa,\
-	org.apache.river,\
+	org.apache.river.osgi.bootstrap,\
 	org.apache.river.api.io,\
 	com.sun.jini.start
 Bundle-Version: 4.0.0

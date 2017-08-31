@@ -8,7 +8,7 @@ Bundle-Version: 0.0.0.${tstamp}
 	org.eclipse.equinox.preferences
 Export-Package: \
 	org.apache.river.bootstrap.service,\
-	org.apache.river.bootstrap,\
+	org.apache.river.osgi,\
 	org.apache.river.bootstrap.client,\
 	org.apache.river.bootstrap.common,\
 	org.apache.river.bootstrap.service.smart,\
