@@ -1,4 +1,4 @@
-package org.apache.river.osgi;
+package org.apache.river.osgi.service.utils;
 
 import java.io.Serializable;
 import java.rmi.Remote;
@@ -11,6 +11,10 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.river.osgi.Constants;
+import org.apache.river.osgi.RiverService;
+import org.apache.river.osgi.utils.RiverUtils;
+import org.apache.river.osgi.utils.ServiceIDManager;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Filter;

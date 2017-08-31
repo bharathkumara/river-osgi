@@ -1,10 +1,12 @@
-package org.apache.river.osgi;
+package org.apache.river.osgi.client.utils;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 
+import org.apache.river.osgi.RiverService;
+import org.apache.river.osgi.utils.RiverUtils;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;

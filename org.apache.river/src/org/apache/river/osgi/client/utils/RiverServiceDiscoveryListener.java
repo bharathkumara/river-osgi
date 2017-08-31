@@ -1,4 +1,4 @@
-package org.apache.river.osgi;
+package org.apache.river.osgi.client.utils;
 
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;

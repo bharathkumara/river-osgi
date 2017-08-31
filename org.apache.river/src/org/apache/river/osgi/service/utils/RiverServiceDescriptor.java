@@ -1,4 +1,4 @@
-package org.apache.river.osgi;
+package org.apache.river.osgi.service.utils;
 
 import net.jini.core.lookup.ServiceItem;
 import net.jini.lookup.JoinManager;

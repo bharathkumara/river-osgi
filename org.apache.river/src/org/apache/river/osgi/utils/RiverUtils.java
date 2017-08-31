@@ -1,4 +1,4 @@
-package org.apache.river.osgi;
+package org.apache.river.osgi.utils;
 
 import java.util.ArrayList;
 import java.util.HashMap;

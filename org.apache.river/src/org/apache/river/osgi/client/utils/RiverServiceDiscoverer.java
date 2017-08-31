@@ -1,4 +1,4 @@
-package org.apache.river.osgi;
+package org.apache.river.osgi.client.utils;
 
 import java.lang.reflect.Proxy;
 import java.rmi.RemoteException;
@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.river.osgi.Constants;
+import org.apache.river.osgi.RiverService;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.InvalidSyntaxException;

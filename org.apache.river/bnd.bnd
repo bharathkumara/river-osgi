@@ -102,8 +102,11 @@ Export-Package: \
 	org.apache.river.discovery.x500.sha256withdsa,\
 	org.apache.river.discovery.x500.sha512withecdsa,\
 	org.apache.river.discovery.x500.sha512withrsa,\
-	org.apache.river.osgi.bootstrap,\
 	org.apache.river.api.io,\
-	com.sun.jini.start
+	com.sun.jini.start,\
+	org.apache.river.osgi,\
+	org.apache.river.osgi.client.utils,\
+	org.apache.river.osgi.service.utils,\
+	org.apache.river.osgi.utils
 Bundle-Version: 4.0.0
 -buildpath: org.eclipse.osgi

@@ -31,7 +31,8 @@
 	org.apache.felix.gogo.runtime;version='[0.16.2,0.16.3)',\
 	org.eclipse.equinox.ds;version='[1.4.400,1.4.401)',\
 	org.eclipse.equinox.util;version='[1.0.500,1.0.501)',\
-	org.eclipse.osgi.services;version='[3.5.100,3.5.101)'
+	org.eclipse.osgi.services;version='[3.5.100,3.5.101)',\
+	org.apache.felix.scr;version='[2.0.6,2.0.7)'
 -runrepos: \
 	Workspace,\
 	Release,\
