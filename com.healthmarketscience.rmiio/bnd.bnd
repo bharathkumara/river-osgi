@@ -4,3 +4,4 @@ Export-Package: \
 	com.healthmarketscience.rmiio.exporter,\
 	com.healthmarketscience.rmiio.socket,\
 	com.healthmarketscience.rmiio.util
+Bundle-Version: 2.1.2.20170831
