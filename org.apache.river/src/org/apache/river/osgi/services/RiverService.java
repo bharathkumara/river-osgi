@@ -1,4 +1,4 @@
-package org.apache.river.osgi;
+package org.apache.river.osgi.services;
 
 public interface RiverService {
 	

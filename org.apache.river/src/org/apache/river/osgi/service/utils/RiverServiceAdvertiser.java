@@ -8,7 +8,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.river.osgi.Constants;
-import org.apache.river.osgi.RiverService;
+import org.apache.river.osgi.services.RiverService;
 import org.apache.river.osgi.utils.RiverUtils;
 import org.apache.river.osgi.utils.ServiceIDManager;
 import org.osgi.framework.Bundle;

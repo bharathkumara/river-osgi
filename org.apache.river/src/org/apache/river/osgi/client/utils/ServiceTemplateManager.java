@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 
-import org.apache.river.osgi.RiverService;
+import org.apache.river.osgi.services.RiverService;
 import org.apache.river.osgi.utils.RiverUtils;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;

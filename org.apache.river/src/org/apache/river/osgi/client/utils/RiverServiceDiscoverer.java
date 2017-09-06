@@ -12,7 +12,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.river.osgi.Constants;
-import org.apache.river.osgi.RiverService;
+import org.apache.river.osgi.services.RiverService;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.InvalidSyntaxException;
