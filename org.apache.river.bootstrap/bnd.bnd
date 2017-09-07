@@ -14,7 +14,7 @@ Export-Package: \
 	org.apache.river.bootstrap.service.smart,\
 	org.apache.river.bootstrap.service.lease
 
-Bundle-Activator: org.apache.river.bootstrap.internal.RiverBootstrapActivator
+
 Private-Package: \
 	org.apache.river.bootstrap.codeserver,\
 	org.apache.river.bootstrap.service.internal,\

@@ -106,7 +106,10 @@ Export-Package: \
 	com.sun.jini.start,\
 	org.apache.river.osgi,\
 	org.apache.river.osgi.client.utils,\
+	org.apache.river.osgi.services,\
 	org.apache.river.osgi.service.utils,\
-	org.apache.river.osgi.utils
+	org.apache.river.osgi.utils,\
+	org.apache.river.osgi.service.utils
 Bundle-Version: 4.0.0
 -buildpath: org.eclipse.osgi
+Private-Package: org.apache.river.osgi.internal

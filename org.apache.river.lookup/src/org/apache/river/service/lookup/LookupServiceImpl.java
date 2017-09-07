@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import org.apache.river.admin.DestroyAdmin;
-import org.apache.river.bootstrap.common.RiverCodeServer;
+import org.apache.river.osgi.services.RiverCodeServer;
 import org.apache.river.start.NonActivatableServiceDescriptor;
 import org.apache.river.start.NonActivatableServiceDescriptor.Created;
 import org.apache.river.start.ServiceStarter;
