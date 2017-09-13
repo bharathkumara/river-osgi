@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
+	<classpathentry kind="con" path="aQute.bnd.classpath.container"/>
+	<classpathentry kind="src" output="bin" path="src"/>
+	<classpathentry kind="src" path="/org.apache.river"/>
+	<classpathentry kind="src" path="/org.apache.river.examples.hello.api"/>
+	<classpathentry kind="lib" path="/cnf/localrepo/org.eclipse.osgi.services/org.eclipse.osgi.services-3.5.100.jar">
+		<attributes>
+			<attribute name="bsn" value="org.eclipse.osgi.services"/>
+			<attribute name="type" value="REPO"/>
+			<attribute name="project" value="org.apache.river.bootstrap"/>
+		</attributes>
+		<accessrules>
+			<accessrule kind="accessible" pattern="org/osgi/service/cm/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/component/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/component/annotations/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/device/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/event/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/http/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/http/context/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/http/runtime/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/http/runtime/dto/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/http/whiteboard/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/log/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/metatype/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/provisioning/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/upnp/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/useradmin/*"/>
+			<accessrule kind="accessible" pattern="org/osgi/service/wireadmin/*"/>
+			<accessrule ignoreifbetter="true" kind="discouraged" pattern="**"/>
+		</accessrules>
+	</classpathentry>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

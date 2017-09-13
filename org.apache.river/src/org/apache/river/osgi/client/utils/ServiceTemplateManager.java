@@ -19,7 +19,6 @@ import net.jini.lookup.ServiceDiscoveryManager;
 public class ServiceTemplateManager extends ServiceTracker<ServiceTemplate, RiverServiceDiscoverer>
 		implements RiverService {
 
-	ServiceDiscoveryManager manager;
 	private ServiceDiscoveryManager discoveryManager;
 
 	public ServiceTemplateManager(BundleContext context, ServiceDiscoveryManager discoveryManager) {

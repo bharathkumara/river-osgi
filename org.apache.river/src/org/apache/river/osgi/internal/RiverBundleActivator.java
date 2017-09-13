@@ -1,4 +1,4 @@
-package org.apache.river.osgi;
+package org.apache.river.osgi.internal;
 
 import java.io.File;
 import java.io.IOException;
@@ -6,8 +6,8 @@ import java.util.Dictionary;
 import java.util.Hashtable;
 import java.util.prefs.Preferences;
 
+import org.apache.river.osgi.Constants;
 import org.apache.river.osgi.client.utils.ServiceTemplateManager;
-import org.apache.river.osgi.internal.EmbeddedCodeServer;
 import org.apache.river.osgi.service.utils.RiverServiceAdvertiser;
 import org.apache.river.osgi.service.utils.RiverServiceExporter;
 import org.apache.river.osgi.services.RiverCodeServer;
@@ -35,7 +35,7 @@ public class RiverBundleActivator implements BundleActivator {
 	private ServiceTemplateManager serviceTemplateManager;
 	private RiverServiceAdvertiser riverServiceAdvertiser;
 	private ServiceIDManager serviceIDManager;
-	RiverServiceExporter remoteServiceTracker;
+	private RiverServiceExporter remoteServiceTracker;
 	private Preferences userRoot;
 
 	@Override
